@@ -1,0 +1,4 @@
+# Artefatti della generazione SDK (workflow sdk.yml)
+openapi-sdk.json
+generated/
+target/

@@ -1,0 +1,82 @@
+name: sdk
+
+# Genera gli SDK pubblici dalla specifica OpenAPI e li pubblica, uno per linguaggio,
+# nei rispettivi repository. Si attiva quando arriva un nuovo spec taggato (il tag v* viene
+# creato qui dal workflow openapi.yml di Amica20.WebApi.CustomerService) oppure manualmente.
+#
+# Richiede il secret SDK_PUSH_TOKEN: un PAT con permesso di push sui repo CIR2000/amica-<lang>.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  # Verifica che il tag esista su https://hub.docker.com/r/openapitools/openapi-generator-cli/tags
+  OPENAPI_GENERATOR_VERSION: v7.11.0
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lang: csharp
+            generator: csharp
+            repo: CIR2000/amica-csharp
+            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true"
+          - lang: python
+            generator: python
+            repo: CIR2000/amica-python
+            props: "packageName=amica_sdk,projectName=amica-sdk"
+          - lang: typescript
+            generator: typescript-fetch
+            repo: CIR2000/amica-typescript
+            props: "npmName=@cir2000/amica-sdk,supportsES6=true"
+          - lang: php
+            generator: php
+            repo: CIR2000/amica-php
+            props: "invokerPackage=Amica\\Sdk,composerVendorName=cir2000,composerProjectName=amica-sdk"
+    steps:
+      - name: Checkout spec repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Pulisci lo spec per gli SDK
+        run: python scripts/clean_openapi_for_sdk.py openapi.json openapi-sdk.json
+
+      - name: Genera SDK (${{ matrix.lang }})
+        env:
+          GENERATOR: ${{ matrix.generator }}
+          PROPS: ${{ matrix.props }}
+        run: |
+          docker run --rm -v "${PWD}:/local" \
+            "openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION}" generate \
+            -i /local/openapi-sdk.json \
+            -g "$GENERATOR" \
+            -o /local/generated \
+            --additional-properties="$PROPS"
+
+      - name: Pubblica in ${{ matrix.repo }}
+        env:
+          GH_TOKEN: ${{ secrets.SDK_PUSH_TOKEN }}
+          TARGET_REPO: ${{ matrix.repo }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target
+          rsync -a --delete --exclude='.git' generated/ target/
+          cd target
+          git config user.name "amica-bot"
+          git config user.email "bot@gestionaleamica.com"
+          git add -A
+          git commit -m "Aggiorna SDK da ${GITHUB_REF_NAME}" || echo "Nessuna modifica da committare"
+          git push
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            git tag "${GITHUB_REF_NAME}"
+            git push origin "${GITHUB_REF_NAME}"
+          fi
