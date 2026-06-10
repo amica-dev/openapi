@@ -1,0 +1,59 @@
+# Amica.Sdk — SDK C# per la Customers API di Amica
+
+{{#appDescriptionWithNewLines}}
+{{{.}}}
+{{/appDescriptionWithNewLines}}
+
+## Installazione
+
+L'SDK dipende da [RestSharp](https://www.nuget.org/packages/RestSharp), [Json.NET](https://www.nuget.org/packages/Newtonsoft.Json/) e [JsonSubTypes](https://www.nuget.org/packages/JsonSubTypes/). Clona il repository e compila la libreria:
+
+```bash
+dotnet build
+```
+
+Quindi referenzia la DLL prodotta (cartella `bin`) nel tuo progetto e importa i namespace:
+
+```csharp
+using {{packageName}}.{{apiPackage}};
+using {{packageName}}.Client;
+using {{packageName}}.{{modelPackage}};
+```
+
+## Per iniziare
+
+```csharp
+using System;
+using {{packageName}}.{{apiPackage}};
+using {{packageName}}.Client;
+using {{packageName}}.{{modelPackage}};
+
+var config = new Configuration
+{
+    BasePath = "https://customerws1.amica20.it",
+    // Access token OAuth 2.0 ottenuto dall'identity provider di Amica
+    AccessToken = "IL_TUO_ACCESS_TOKEN"
+};
+
+// Elenco delle aziende disponibili per le credenziali in uso
+var aziende = new AziendaApi(config);
+try
+{
+    var result = aziende.ApiVversionConfigAziendaGet("3");
+    Console.WriteLine(result);
+}
+catch (ApiException e)
+{
+    Console.WriteLine($"Errore nella chiamata all'API: {e.Message} (HTTP {e.ErrorCode})");
+}
+```
+
+## Documentazione
+
+- **Endpoint e modelli**: la documentazione di dettaglio, una pagina per ogni risorsa, è nella cartella [`docs/`](docs/) di questo repository.
+- **API Reference interattiva**: prova gli endpoint dal browser su [customerws1.amica20.it/api/v3/docs](https://customerws1.amica20.it/api/v3/docs).
+- **Guide e autenticazione**: [amica.dev](https://amica.dev).
+
+---
+
+SDK generato automaticamente con [OpenAPI Generator](https://openapi-generator.tech) — API `{{appVersion}}`, SDK `{{packageVersion}}`, generator `{{generatorVersion}}`.

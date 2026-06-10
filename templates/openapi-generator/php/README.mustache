@@ -1,0 +1,46 @@
+# amica-sdk — SDK PHP per la Customers API di Amica
+
+{{#appDescriptionWithNewLines}}
+{{{.}}}
+{{/appDescriptionWithNewLines}}
+
+## Installazione
+
+Richiede PHP 7.4+ e [Composer](https://getcomposer.org/). Clona il repository e installa le dipendenze:
+
+```bash
+git clone https://github.com/CIR2000/amica-php.git
+cd amica-php
+composer install
+```
+
+## Per iniziare
+
+```php
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+$config = {{invokerPackage}}\Configuration::getDefaultConfiguration()
+    ->setHost('https://customerws1.amica20.it')
+    ->setAccessToken('IL_TUO_ACCESS_TOKEN'); // access token OAuth 2.0 ottenuto da Amica
+
+// Elenco delle aziende disponibili per le credenziali in uso
+$apiInstance = new {{invokerPackage}}\Api\AziendaApi(new GuzzleHttp\Client(), $config);
+
+try {
+    $result = $apiInstance->apiVversionConfigAziendaGet('3');
+    print_r($result);
+} catch (Exception $e) {
+    echo "Errore nella chiamata all'API: ", $e->getMessage(), PHP_EOL;
+}
+```
+
+## Documentazione
+
+- **Endpoint e modelli**: la documentazione di dettaglio, una pagina per ogni risorsa, è nella cartella [`docs/`](docs/) di questo repository.
+- **API Reference interattiva**: prova gli endpoint dal browser su [customerws1.amica20.it/api/v3/docs](https://customerws1.amica20.it/api/v3/docs).
+- **Guide e autenticazione**: [amica.dev](https://amica.dev).
+
+---
+
+SDK generato automaticamente con [OpenAPI Generator](https://openapi-generator.tech) — API `{{appVersion}}`, generator `{{generatorVersion}}`.

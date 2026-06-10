@@ -60,6 +60,7 @@ jobs:
             "openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION}" generate \
             -i /local/openapi-sdk.json \
             -g "$GENERATOR" \
+            -t "/local/templates/openapi-generator/${{ matrix.lang }}" \
             -o /local/generated \
             --additional-properties="$PROPS"
 

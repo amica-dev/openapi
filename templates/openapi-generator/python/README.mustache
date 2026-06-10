@@ -1,0 +1,44 @@
+# amica-sdk — SDK Python per la Customers API di Amica
+
+{{#appDescriptionWithNewLines}}
+{{{.}}}
+{{/appDescriptionWithNewLines}}
+
+## Installazione
+
+Richiede Python {{{generatorLanguageVersion}}}. Installa direttamente dal repository:
+
+```bash
+pip install git+https://github.com/CIR2000/amica-python.git
+```
+
+## Per iniziare
+
+```python
+import amica_sdk
+from amica_sdk.rest import ApiException
+
+config = amica_sdk.Configuration(
+    host="https://customerws1.amica20.it",
+    access_token="IL_TUO_ACCESS_TOKEN",  # access token OAuth 2.0 ottenuto da Amica
+)
+
+with amica_sdk.ApiClient(config) as api_client:
+    # Elenco delle aziende disponibili per le credenziali in uso
+    aziende = amica_sdk.AziendaApi(api_client)
+    try:
+        result = aziende.api_vversion_config_azienda_get("3")
+        print(result)
+    except ApiException as e:
+        print(f"Errore nella chiamata all'API: {e}")
+```
+
+## Documentazione
+
+- **Endpoint e modelli**: la documentazione di dettaglio, una pagina per ogni risorsa, è nella cartella [`docs/`](docs/) di questo repository.
+- **API Reference interattiva**: prova gli endpoint dal browser su [customerws1.amica20.it/api/v3/docs](https://customerws1.amica20.it/api/v3/docs).
+- **Guide e autenticazione**: [amica.dev](https://amica.dev).
+
+---
+
+SDK generato automaticamente con [OpenAPI Generator](https://openapi-generator.tech) — API `{{appVersion}}`, SDK `{{packageVersion}}`, generator `{{generatorVersion}}`.
