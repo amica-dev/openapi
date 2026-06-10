@@ -69,7 +69,8 @@ jobs:
           TARGET_REPO: ${{ matrix.repo }}
         run: |
           git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target
-          rsync -a --delete --exclude='.git' generated/ target/
+          # Esclude .github: i workflow CI generati non sono pubblicabili con un PAT senza scope 'workflow'.
+          rsync -a --delete --exclude='.git' --exclude='.github' generated/ target/
           cd target
           git config user.name "amica-bot"
           git config user.email "bot@gestionaleamica.com"
