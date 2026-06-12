@@ -26,19 +26,19 @@ jobs:
           - lang: csharp
             generator: csharp
             repo: amica-dev/csharp-sdk
-            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true"
+            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true,gitUserId=amica-dev,gitRepoId=csharp-sdk"
           - lang: python
             generator: python
             repo: amica-dev/python-sdk
-            props: "packageName=amica_python_sdk,projectName=amica-python-sdk"
+            props: "packageName=amica_python_sdk,projectName=amica-python-sdk,gitUserId=amica-dev,gitRepoId=python-sdk"
           - lang: typescript
             generator: typescript-fetch
             repo: amica-dev/typescript-sdk
-            props: "npmName=@amica/typescript-sdk,supportsES6=true"
+            props: "npmName=@amica/typescript-sdk,supportsES6=true,gitUserId=amica-dev,gitRepoId=typescript-sdk"
           - lang: php
             generator: php
             repo: amica-dev/php-sdk
-            props: "invokerPackage=Amica\\Sdk,composerVendorName=amica,composerProjectName=php-sdk"
+            props: "invokerPackage=Amica\\Sdk,composerPackageName=amica/php-sdk,gitUserId=amica-dev,gitRepoId=php-sdk"
     steps:
       - name: Checkout spec repository
         uses: actions/checkout@v4
