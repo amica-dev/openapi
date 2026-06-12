@@ -58,17 +58,20 @@ jobs:
           TARGET_REPO: ${{ matrix.repo }}
         run: |
           # gitUserId/gitRepoId vanno passati come flag dedicati (non additional-properties):
-          # popolano repository URL / homepage / source nei metadati dei pacchetti.
-          GIT_USER_ID="${TARGET_REPO%%/*}"
-          GIT_REPO_ID="${TARGET_REPO##*/}"
+          # popolano i repository URL nei metadati dei pacchetti (C#/Python/TypeScript).
+          # Per PHP li omettiamo: sovrascriverebbero composerPackageName (amica/php-sdk ->
+          # amica-dev/php-sdk) senza in cambio popolare homepage/source.
+          GIT_FLAGS=()
+          if [ "${{ matrix.lang }}" != "php" ]; then
+            GIT_FLAGS=(--git-user-id "${TARGET_REPO%%/*}" --git-repo-id "${TARGET_REPO##*/}")
+          fi
           docker run --rm -v "${PWD}:/local" \
             "openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION}" generate \
             -i /local/openapi-sdk.json \
             -g "$GENERATOR" \
             -t "/local/templates/openapi-generator/${{ matrix.lang }}" \
             -o /local/generated \
-            --git-user-id "$GIT_USER_ID" \
-            --git-repo-id "$GIT_REPO_ID" \
+            "${GIT_FLAGS[@]}" \
             --additional-properties="$PROPS"
 
       - name: Pubblica in ${{ matrix.repo }}
