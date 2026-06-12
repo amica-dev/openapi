@@ -1,12 +1,12 @@
 # Amica OpenAPI
 
-Questo repository contiene la **specifica OpenAPI** curata della [Customer API](https://customerws1.amica20.it/api/v3/docs)
-di Amica ed è la sorgente da cui vengono generati gli SDK pubblici.
+Questo repository contiene la **specifica OpenAPI** curata dell'[Amica Cloud API](https://customerws1.amica20.it/api/v3/docs)
+ed è la sorgente da cui vengono generati gli SDK pubblici.
 
 ## Contenuto
 
-- `openapi.json` — la specifica OpenAPI v3, aggiornata e taggata a ogni rilascio della
-  Customer API.
+- `openapi.json` — la specifica OpenAPI v3, aggiornata e taggata a ogni rilascio
+  dell'Amica Cloud API.
 - `scripts/clean_openapi_for_sdk.py` — prepara lo spec per la generazione degli SDK
   (rimuove i tipi interni orfani e l'estensione `x-internal`).
 - `.github/workflows/sdk.yml` — genera gli SDK con [OpenAPI Generator](https://openapi-generator.tech)
