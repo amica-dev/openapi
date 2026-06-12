@@ -4,7 +4,7 @@ name: sdk
 # nei rispettivi repository. Si attiva quando arriva un nuovo spec taggato (il tag v* viene
 # creato qui dal workflow openapi.yml di Amica20.WebApi.CustomerService) oppure manualmente.
 #
-# Richiede il secret SDK_PUSH_TOKEN: un PAT con permesso di push sui repo CIR2000/amica-<lang>.
+# Richiede il secret SDK_PUSH_TOKEN: un PAT con permesso di push sui repo amica-dev/<lang>-sdk.
 
 on:
   push:
@@ -25,20 +25,20 @@ jobs:
         include:
           - lang: csharp
             generator: csharp
-            repo: CIR2000/amica-csharp
+            repo: amica-dev/csharp-sdk
             props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true"
           - lang: python
             generator: python
-            repo: CIR2000/amica-python
-            props: "packageName=amica_sdk,projectName=amica-sdk"
+            repo: amica-dev/python-sdk
+            props: "packageName=amica_python_sdk,projectName=amica-python-sdk"
           - lang: typescript
             generator: typescript-fetch
-            repo: CIR2000/amica-typescript
-            props: "npmName=@cir2000/amica-sdk,supportsES6=true"
+            repo: amica-dev/typescript-sdk
+            props: "npmName=@amica/typescript-sdk,supportsES6=true"
           - lang: php
             generator: php
-            repo: CIR2000/amica-php
-            props: "invokerPackage=Amica\\Sdk,composerVendorName=cir2000,composerProjectName=amica-sdk"
+            repo: amica-dev/php-sdk
+            props: "invokerPackage=Amica\\Sdk,composerVendorName=amica,composerProjectName=php-sdk"
     steps:
       - name: Checkout spec repository
         uses: actions/checkout@v4
