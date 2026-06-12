@@ -26,19 +26,19 @@ jobs:
           - lang: csharp
             generator: csharp
             repo: amica-dev/csharp-sdk
-            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true,gitUserId=amica-dev,gitRepoId=csharp-sdk"
+            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true"
           - lang: python
             generator: python
             repo: amica-dev/python-sdk
-            props: "packageName=amica_python_sdk,projectName=amica-python-sdk,gitUserId=amica-dev,gitRepoId=python-sdk"
+            props: "packageName=amica_python_sdk,projectName=amica-python-sdk"
           - lang: typescript
             generator: typescript-fetch
             repo: amica-dev/typescript-sdk
-            props: "npmName=@amica/typescript-sdk,supportsES6=true,gitUserId=amica-dev,gitRepoId=typescript-sdk"
+            props: "npmName=@amica/typescript-sdk,supportsES6=true"
           - lang: php
             generator: php
             repo: amica-dev/php-sdk
-            props: "invokerPackage=Amica\\Sdk,composerPackageName=amica/php-sdk,gitUserId=amica-dev,gitRepoId=php-sdk"
+            props: "invokerPackage=Amica\\Sdk,composerPackageName=amica/php-sdk"
     steps:
       - name: Checkout spec repository
         uses: actions/checkout@v4
@@ -55,13 +55,20 @@ jobs:
         env:
           GENERATOR: ${{ matrix.generator }}
           PROPS: ${{ matrix.props }}
+          TARGET_REPO: ${{ matrix.repo }}
         run: |
+          # gitUserId/gitRepoId vanno passati come flag dedicati (non additional-properties):
+          # popolano repository URL / homepage / source nei metadati dei pacchetti.
+          GIT_USER_ID="${TARGET_REPO%%/*}"
+          GIT_REPO_ID="${TARGET_REPO##*/}"
           docker run --rm -v "${PWD}:/local" \
             "openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION}" generate \
             -i /local/openapi-sdk.json \
             -g "$GENERATOR" \
             -t "/local/templates/openapi-generator/${{ matrix.lang }}" \
             -o /local/generated \
+            --git-user-id "$GIT_USER_ID" \
+            --git-repo-id "$GIT_REPO_ID" \
             --additional-properties="$PROPS"
 
       - name: Pubblica in ${{ matrix.repo }}
