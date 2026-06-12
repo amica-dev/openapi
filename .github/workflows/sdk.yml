@@ -26,19 +26,23 @@ jobs:
           - lang: csharp
             generator: csharp
             repo: amica-dev/csharp-sdk
-            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true"
+            versionProp: packageVersion
+            props: "packageName=Amica.Sdk,targetFramework=net8.0,nullableReferenceTypes=true,licenseId=MIT"
           - lang: python
             generator: python
             repo: amica-dev/python-sdk
+            versionProp: packageVersion
             props: "packageName=amica_python_sdk,projectName=amica-python-sdk"
           - lang: typescript
             generator: typescript-fetch
             repo: amica-dev/typescript-sdk
-            props: "npmName=@amica/typescript-sdk,supportsES6=true"
+            versionProp: npmVersion
+            props: "npmName=@amica/typescript-sdk,supportsES6=true,licenseName=MIT"
           - lang: php
             generator: php
             repo: amica-dev/php-sdk
-            props: "invokerPackage=Amica\\Sdk,composerPackageName=amica/php-sdk"
+            versionProp: artifactVersion
+            props: "invokerPackage=Amica\\Sdk,composerPackageName=amica/php-sdk,licenseName=MIT"
     steps:
       - name: Checkout spec repository
         uses: actions/checkout@v4
@@ -56,7 +60,16 @@ jobs:
           GENERATOR: ${{ matrix.generator }}
           PROPS: ${{ matrix.props }}
           TARGET_REPO: ${{ matrix.repo }}
+          VERSION_PROP: ${{ matrix.versionProp }}
         run: |
+          # Versione del pacchetto: derivata dal tag di release (v3.0.0-beta3 -> 3.0.0-beta3);
+          # per i dispatch manuali su branch usiamo un placeholder di sviluppo.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          PROPS="${PROPS},${VERSION_PROP}=${VERSION}"
           # gitUserId/gitRepoId vanno passati come flag dedicati (non additional-properties):
           # popolano i repository URL nei metadati dei pacchetti (C#/Python/TypeScript).
           # Per PHP li omettiamo: sovrascriverebbero composerPackageName (amica/php-sdk ->
