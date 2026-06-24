@@ -4,7 +4,13 @@ name: sdk
 # nei rispettivi repository. Si attiva quando arriva un nuovo spec taggato (il tag v* viene
 # creato qui dal workflow openapi.yml di Amica20.WebApi.CustomerService) oppure manualmente.
 #
-# Richiede il secret SDK_PUSH_TOKEN: un PAT con permesso di push sui repo amica-dev/<lang>-sdk.
+# A ogni tag v* aggiorna il codice degli SDK, li tagga e crea una GitHub Release su ciascun
+# repo con allegati gli artefatti compilati (.nupkg per C#, wheel/sdist per Python, tarball npm
+# per TypeScript, zip sorgente per PHP), così da abilitare l'installazione anche dove il gestore
+# di pacchetti non installa direttamente da git (in primis NuGet).
+#
+# Richiede il secret SDK_PUSH_TOKEN: un PAT con permesso di push E di creazione release sui
+# repo amica-dev/<lang>-sdk (scope `repo`).
 
 on:
   push:
@@ -87,10 +93,49 @@ jobs:
             "${GIT_FLAGS[@]}" \
             --additional-properties="$PROPS"
 
+      # Toolchain per la compilazione degli artefatti, una per linguaggio (solo sui tag).
+      - name: Setup .NET (csharp)
+        if: matrix.lang == 'csharp' && github.ref_type == 'tag'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0'
+
+      - name: Setup Node (typescript)
+        if: matrix.lang == 'typescript' && github.ref_type == 'tag'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Costruisci artefatto (${{ matrix.lang }})
+        if: github.ref_type == 'tag'
+        env:
+          LANG_ID: ${{ matrix.lang }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          case "$LANG_ID" in
+            csharp)
+              PROJ="$(find generated -name 'Amica.Sdk.csproj' | head -1)"
+              dotnet pack "$PROJ" -c Release -o artifacts
+              ;;
+            python)
+              python -m pip install --upgrade build
+              python -m build generated --outdir artifacts
+              ;;
+            typescript)
+              ( cd generated && npm install && npm run build --if-present && npm pack --pack-destination ../artifacts )
+              ;;
+            php)
+              ( cd generated && zip -r ../artifacts/amica-php-sdk.zip . -x '.git/*' )
+              ;;
+          esac
+          echo "Artefatti prodotti:" && ls -la artifacts
+
       - name: Pubblica in ${{ matrix.repo }}
         env:
           GH_TOKEN: ${{ secrets.SDK_PUSH_TOKEN }}
           TARGET_REPO: ${{ matrix.repo }}
+          LANG_ID: ${{ matrix.lang }}
         run: |
           git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target
           # Esclude .github: i workflow CI generati non sono pubblicabili con un PAT senza scope 'workflow'.
@@ -104,4 +149,11 @@ jobs:
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             git tag "${GITHUB_REF_NAME}"
             git push origin "${GITHUB_REF_NAME}"
+            # Crea la GitHub Release sul repo SDK con gli artefatti compilati in allegato.
+            gh release create "${GITHUB_REF_NAME}" \
+              --repo "${TARGET_REPO}" \
+              --title "${LANG_ID}-sdk ${GITHUB_REF_NAME}" \
+              --notes "SDK ${LANG_ID} generato dalla specifica OpenAPI ${GITHUB_REF_NAME}." \
+              --latest \
+              "${GITHUB_WORKSPACE}"/artifacts/*
           fi
