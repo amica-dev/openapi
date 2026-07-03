@@ -92,6 +92,9 @@ jobs:
             -o /local/generated \
             "${GIT_FLAGS[@]}" \
             --additional-properties="$PROPS"
+          # openapi-generator gira come root nel container: la dir generata esce root-owned e i
+          # successivi step di build (dotnet/npm/python) non potrebbero scriverci. Riallinea l'owner.
+          sudo chown -R "$(id -u):$(id -g)" generated
 
       # Toolchain per la compilazione degli artefatti, una per linguaggio (solo sui tag).
       - name: Setup .NET (csharp)
@@ -147,13 +150,20 @@ jobs:
           git commit -m "Aggiorna SDK da ${GITHUB_REF_NAME}" || echo "Nessuna modifica da committare"
           git push
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            git tag "${GITHUB_REF_NAME}"
-            git push origin "${GITHUB_REF_NAME}"
-            # Crea la GitHub Release sul repo SDK con gli artefatti compilati in allegato.
+            # -f per essere ri-eseguibile: se il tag/Release esistono già (es. re-build dello
+            # stesso tag dopo un fix di pipeline) aggiorna invece di fallire.
+            git tag -f "${GITHUB_REF_NAME}"
+            git push -f origin "${GITHUB_REF_NAME}"
+            # Crea la GitHub Release sul repo SDK con gli artefatti compilati in allegato; se
+            # esiste già, ricarica gli artefatti (--clobber) invece di fallire.
             gh release create "${GITHUB_REF_NAME}" \
               --repo "${TARGET_REPO}" \
               --title "${LANG_ID}-sdk ${GITHUB_REF_NAME}" \
               --notes "SDK ${LANG_ID} generato dalla specifica OpenAPI ${GITHUB_REF_NAME}." \
               --latest \
+              "${GITHUB_WORKSPACE}"/artifacts/* \
+            || gh release upload "${GITHUB_REF_NAME}" \
+              --repo "${TARGET_REPO}" \
+              --clobber \
               "${GITHUB_WORKSPACE}"/artifacts/*
           fi
