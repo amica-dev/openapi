@@ -66469,8 +66469,10 @@
         "type": "object",
         "properties": {
           "key": {
-            "description": "Chiave di distinzione (es.: \"RagioneSociale1\").",
-            "nullable": true
+            "enum": [
+              null
+            ],
+            "description": "Chiave di distinzione (es.: \"RagioneSociale1\")."
           },
           "items": {
             "type": "array",
