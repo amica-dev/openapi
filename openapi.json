@@ -2,12 +2,12 @@
   "openapi": "3.0.4",
   "info": {
     "title": "Amica Cloud API",
-    "description": "L'Amica Cloud API fornisce accesso programmatico a tutti i dati aziendali gestiti da [Amica 20](https://gestionaleamica.com). Supporta il ciclo completo di documenti, fatture, magazzino, contabilità e anagrafiche. Per guide e documentazione completa, visitare [amica.dev](https://amica.dev/).\n\n## Autenticazione\n\nTutte le richieste API richiedono un token OAuth 2.0 Bearer valido, da includere nell'header `Authorization`:\n\n```\nAuthorization: Bearer <token>\n```\n\n### Registra la tua app\n\nPer integrare l'Amica Cloud API registra la tua applicazione sull'[**App Store di Amica**](https://apps.amica20.it). Al termine della registrazione ottieni una coppia di credenziali OAuth 2.0 — `client_id` e `client_secret` (il secret è mostrato **una sola volta**) — e scegli gli **scope** e il **flusso di autenticazione** desiderati.\n\n### Scegli il flusso\n\nLa scelta dipende da **come** la tua applicazione si autentica:\n\n- C'è un **utente** che può accedere via browser (web app, SPA, app mobile)? → **Authorization Code con PKCE**.\n- È un **servizio headless** (backend, batch, integrazione server-to-server) di una **singola azienda**, senza un utente che effettua il login? → **Client Credentials**.\n\n#### Authorization Code con PKCE\n\nConsigliato per le app che operano per conto di un utente Amica ed è l'**unico flusso disponibile per le app pubblicate sul marketplace**. Una sola registrazione serve un numero qualsiasi di aziende: ogni utente autorizza la tua app per la propria azienda tramite la pagina di consenso dell'identity provider, e il token riceve automaticamente il contesto di quell'azienda. La tua app riceve un `code` da scambiare con un access token.\n\n```\nGET  {identity-provider}/connect/authorize?response_type=code&client_id=<client_id>&redirect_uri=<redirect_uri>&scope=openid%20read%20write%20documenti&code_challenge=<challenge>&code_challenge_method=S256\nPOST {identity-provider}/connect/token\n     grant_type=authorization_code&code=<code>&code_verifier=<verifier>&client_id=<client_id>&client_secret=<client_secret>&redirect_uri=<redirect_uri>\n```\n\n#### Client Credentials\n\nPer integrazioni **server-to-server** senza utente interattivo. Disponibile solo per le **app private**, non per quelle pubblicate sul marketplace. Un'app Client Credentials è **legata a una singola azienda** — quella dell'utente che la registra — e il token ne riceve automaticamente il contesto. Per servire un'azienda diversa serve una registrazione separata; se devi distribuire la stessa app a più aziende usa invece **Authorization Code**.\n\n```\nPOST {identity-provider}/connect/token\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>&scope=comune read write documenti\n```\n\n> **Importante:** non includere lo scope `openid` (né `profile`/`email`) in questo flusso. `openid` attiva OpenID Connect — richiede un utente che effettua il login e l'emissione di un ID token — cosa che un flusso server-to-server non prevede: la richiesta viene rifiutata con l'errore `Client cannot request OpenID scopes in client credentials flow`. Indica solo gli scope di risorsa (`comune`, `magazzino`, `documenti`, `contabilita`, ed eventualmente `read`/`write`).\n\nIn entrambi i casi la risposta contiene l'`access_token` (JWT con `aud: amica-cloud`) da usare nelle chiamate successive finché non scade (`expires_in`), dopodiché va richiesto un nuovo token. Ogni token contiene uno o più **scope** che determinano le aree accessibili (vedi sotto). Dalla [API Reference](https://amica.dev) è possibile incollare un access token per provare gli endpoint direttamente dal browser.\n\n## Scope di autorizzazione\n\nL'accesso agli endpoint è governato dagli scope presenti nel token OAuth:\n\n| Scope | Descrizione |\n|-|-|\n| `comune` | Anagrafiche: contatti, indirizzi, nazioni, valute, modalità di pagamento, ecc. |\n| `magazzino` | Magazzino: articoli, listini, movimenti di magazzino, giacenze, distinte base. |\n| `contabilita` | Contabilità: registrazioni contabili, scadenze, castelletti IVA, fatture elettroniche XML. |\n| `documenti` | Documenti: fatture, note di credito, DDT, ordini, preventivi, proforma ed emissione. |\n\nUna richiesta verso un endpoint non coperto dallo scope del token riceverà una risposta `403 Forbidden`.\n\n## Company ID\n\nLa maggior parte degli endpoint è relativa a una specifica azienda e segue il pattern:\n\n```\n/api/v3/{companyId}/risorsa\n```\n\nIl `companyId` è l'identificativo univoco di ciascun database aziendale. Usare l'endpoint `GET /api/v3/config/Azienda` per ottenere l'elenco delle aziende disponibili.\n\n## Paginazione\n\nGli endpoint che restituiscono liste supportano la paginazione tramite query parameter:\n\n| Parametro | Descrizione |\n|-|-|\n| `Skip` | Numero di elementi da saltare dall'inizio del set di risultati. |\n| `Take` | Numero di elementi da includere nella risposta. |\n\nLa risposta include due header:\n\n| Header | Descrizione |\n|-|-|\n| `X-Read-TotalCount` | Numero totale di elementi che soddisfano il filtro corrente. |\n| `X-Read-Count` | Numero di elementi effettivamente restituiti nel body della risposta. |\n\n## Ordinamento e filtri\n\nGli endpoint lista accettano parametri aggiuntivi:\n\n| Parametro | Descrizione |\n|-|-|\n| `Order` | Lista di proprietà per l'ordinamento, separate da virgola. Un segno meno (`-`) prima del nome indica ordine discendente. Es. `-RagioneSociale1,Citta`. |\n| `Filter` | Condizioni di ricerca: lista di espressioni separate da virgola, ciascuna formata da nome campo, operatore, valore ed eventuale connettore logico. Operatori: `$eq`, `$ne`, `$gt`, `$lt`, `$lte`, `$gte`, `$ct` (contiene), `$nct`, `$sw` (inizia con), `$ew` (finisce con). Connettori: `$and` (default, omissibile) e `$or`; le sotto-query si racchiudono tra `[]`. Es. `RagioneSociale1 $ct acme $or, Fido $gt 1000`. |\n| `SkipTotalCount` | Se `true`, l'header `X-Read-TotalCount` viene omesso dalla risposta: migliori prestazioni a scapito del conteggio totale. Default `false`. |\n\n## Espansione oggetti correlati\n\nGli endpoint singoli e lista supportano il parametro `Expand`. Quando fornito, gli oggetti correlati vengono inclusi inline nella risposta anziché restituiti come riferimenti. È possibile specificare espansioni multiple separate da virgola.\n\n## Gestione errori\n\nL'API usa codici di stato HTTP standard e restituisce [RFC 7807](https://tools.ietf.org/html/rfc7807) Problem Details in caso di errore:\n\n| Codice | Significato |\n|-|-|\n| `400` | Bad Request — validazione fallita o parametro obbligatorio mancante. |\n| `401` | Unauthorized — token mancante o scaduto. |\n| `403` | Forbidden — il token non possiede lo scope richiesto. |\n| `404` | Not Found — la risorsa richiesta non esiste. |\n| `409` | Conflict — conflitto di concorrenza. |\n| `422` | Unprocessable Entity — entità non processabile (es. token di concorrenza obsoleto). |\n\nAlcune risposte `400` includono un campo `overridable` che indica se l'errore di validazione può essere ignorato impostando il parametro `validationOverride` a `true`.\n\n## Controllo della concorrenza\n\nLe entità contengono una proprietà `ConcurrencyToken`. Quando si aggiorna un'entità tramite `PUT`, il token nel body della richiesta viene confrontato con il valore memorizzato. Se differiscono, viene restituito un `422 Unprocessable Entity`. Usare sempre l'ultimo token ricevuto da una risposta `GET` o `POST`.\n",
+    "description": "L'Amica Cloud API fornisce accesso programmatico a tutti i dati aziendali gestiti da [Amica 20](https://gestionaleamica.com). Supporta il ciclo completo di documenti, fatture, magazzino, contabilità e anagrafiche. Per guide e documentazione completa, visitare [amica.dev](https://amica.dev/).\n\n## Autenticazione\n\nTutte le richieste API richiedono un token OAuth 2.0 Bearer valido, da includere nell'header `Authorization`:\n\n```\nAuthorization: Bearer <token>\n```\n\n### Registra la tua app\n\nPer integrare l'Amica Cloud API registra la tua applicazione sull'[**App Store di Amica**](https://apps.amica20.it). Al termine della registrazione ottieni una coppia di credenziali OAuth 2.0 — `client_id` e `client_secret` (il secret è mostrato **una sola volta**) — e scegli gli **scope** e il **flusso di autenticazione** desiderati.\n\n### Scegli il flusso\n\nLa scelta dipende da **come** la tua applicazione si autentica:\n\n- C'è un **utente** che può accedere via browser (web app, SPA, app mobile)? → **Authorization Code con PKCE**.\n- È un **servizio headless** (backend, batch, integrazione server-to-server) di una **singola azienda**, senza un utente che effettua il login? → **Client Credentials**.\n\n#### Authorization Code con PKCE\n\nConsigliato per le app che operano per conto di un utente Amica ed è l'**unico flusso disponibile per le app pubblicate sul marketplace**. Una sola registrazione serve un numero qualsiasi di aziende: ogni utente autorizza la tua app per la propria azienda tramite la pagina di consenso dell'identity provider, e il token riceve automaticamente il contesto di quell'azienda. La tua app riceve un `code` da scambiare con un access token.\n\n```\nGET  {identity-provider}/connect/authorize?response_type=code&client_id=<client_id>&redirect_uri=<redirect_uri>&scope=openid%20read%20write%20documenti&code_challenge=<challenge>&code_challenge_method=S256\nPOST {identity-provider}/connect/token\n     grant_type=authorization_code&code=<code>&code_verifier=<verifier>&client_id=<client_id>&client_secret=<client_secret>&redirect_uri=<redirect_uri>\n```\n\n#### Client Credentials\n\nPer integrazioni **server-to-server** senza utente interattivo. Disponibile solo per le **app private**, non per quelle pubblicate sul marketplace. Un'app Client Credentials è **legata a una singola azienda** — quella dell'utente che la registra — e il token ne riceve automaticamente il contesto. Per servire un'azienda diversa serve una registrazione separata; se devi distribuire la stessa app a più aziende usa invece **Authorization Code**.\n\n```\nPOST {identity-provider}/connect/token\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>&scope=comune read write documenti\n```\n\n> **Importante:** non includere lo scope `openid` (né `profile`/`email`) in questo flusso. `openid` attiva OpenID Connect — richiede un utente che effettua il login e l'emissione di un ID token — cosa che un flusso server-to-server non prevede: la richiesta viene rifiutata con l'errore `Client cannot request OpenID scopes in client credentials flow`. Indica solo gli scope di risorsa (`comune`, `magazzino`, `documenti`, `contabilita`, ed eventualmente `read`/`write`).\n\nIn entrambi i casi la risposta contiene l'`access_token` (JWT con `aud: amica-cloud`) da usare nelle chiamate successive finché non scade (`expires_in`), dopodiché va richiesto un nuovo token. Ogni token contiene uno o più **scope** che determinano le aree accessibili (vedi sotto). Dalla [API Reference](https://amica.dev) è possibile incollare un access token per provare gli endpoint direttamente dal browser.\n\n## Scope di autorizzazione\n\nL'accesso agli endpoint è governato dagli scope presenti nel token OAuth:\n\n| Scope | Descrizione |\n|-|-|\n| `comune` | Anagrafiche: contatti, indirizzi, nazioni, valute, modalità di pagamento, ecc. |\n| `magazzino` | Magazzino: articoli, listini, movimenti di magazzino, giacenze, distinte base. |\n| `contabilita` | Contabilità: registrazioni contabili, scadenze, castelletti IVA, fatture elettroniche XML. |\n| `documenti` | Documenti: fatture, note di credito, DDT, ordini, preventivi, proforma ed emissione. |\n\nUna richiesta verso un endpoint non coperto dallo scope del token riceverà una risposta `403 Forbidden`.\n\n## Company ID\n\nLa maggior parte degli endpoint è relativa a una specifica azienda e segue il pattern:\n\n```\n/api/v3/{companyId}/risorsa\n```\n\nIl `companyId` è l'identificativo univoco di ciascun database aziendale. Usare l'endpoint `GET /api/v3/config/Azienda` per ottenere l'elenco delle aziende disponibili.\n\n## Paginazione\n\nGli endpoint che restituiscono liste supportano la paginazione tramite query parameter:\n\n| Parametro | Descrizione |\n|-|-|\n| `Skip` | Numero di elementi da saltare dall'inizio del set di risultati. |\n| `Take` | Numero di elementi da includere nella risposta. |\n\nLa risposta include due header:\n\n| Header | Descrizione |\n|-|-|\n| `X-Read-TotalCount` | Numero totale di elementi che soddisfano il filtro corrente. |\n| `X-Read-Count` | Numero di elementi effettivamente restituiti nel body della risposta. |\n\n## Ordinamento e filtri\n\nGli endpoint lista accettano parametri aggiuntivi:\n\n| Parametro | Descrizione |\n|-|-|\n| `Order` | Lista di proprietà per l'ordinamento, separate da virgola. Un segno meno (`-`) prima del nome indica ordine discendente. Es. `-RagioneSociale1,Citta`. |\n| `Filter` | Condizioni di ricerca: lista di espressioni separate da virgola, ciascuna formata da nome campo, operatore, valore ed eventuale connettore logico. Operatori: `$eq`, `$ne`, `$gt`, `$lt`, `$lte`, `$gte`, `$ct` (contiene), `$nct`, `$sw` (inizia con), `$ew` (finisce con). Connettori: `$and` (default, omissibile) e `$or`; le sotto-query si racchiudono tra `[]`. Es. `RagioneSociale1 $ct acme $or, Fido $gt 1000`. |\n| `SkipTotalCount` | Se `true`, l'header `X-Read-TotalCount` viene omesso dalla risposta: migliori prestazioni a scapito del conteggio totale. Default `false`. |\n\n## Espansione oggetti correlati\n\nGli endpoint singoli e lista supportano il parametro `Expand`. Quando fornito, gli oggetti correlati vengono inclusi inline nella risposta anziché restituiti come riferimenti. È possibile specificare espansioni multiple separate da virgola.\n\n## Gestione errori\n\nL'API usa codici di stato HTTP standard e restituisce [RFC 7807](https://tools.ietf.org/html/rfc7807) Problem Details in caso di errore:\n\n| Codice | Significato |\n|-|-|\n| `400` | Bad Request — validazione fallita o parametro obbligatorio mancante. |\n| `401` | Unauthorized — token mancante o scaduto. |\n| `403` | Forbidden — il token non possiede lo scope richiesto. |\n| `404` | Not Found — la risorsa richiesta non esiste. |\n| `409` | Conflict — conflitto di concorrenza. |\n| `422` | Unprocessable Entity — entità non processabile (es. token di concorrenza obsoleto). |\n\nIl motivo dell'errore è sempre nel campo `detail`. Ogni risposta di errore riporta inoltre `overridable`: quando vale `true`, l'errore di validazione è *forzabile* e basta ripetere la stessa richiesta aggiungendo `validationOverride=true` alla query string perché il servizio la accetti. È il caso delle anomalie formali su dati reali — la partita IVA di un fornitore estero, per esempio — che il cliente ha comunque bisogno di registrare.\n\n## Controllo della concorrenza\n\nLe entità contengono una proprietà `ConcurrencyToken`. Quando si aggiorna un'entità tramite `PUT`, il token nel body della richiesta viene confrontato con il valore memorizzato. Se differiscono, viene restituito un `422 Unprocessable Entity`. Usare sempre l'ultimo token ricevuto da una risposta `GET` o `POST`.\n",
     "contact": {
       "url": "https://amica.dev",
       "email": "assistenza@gestionaleamica.com"
     },
-    "version": "v3",
+    "version": "3.0.1",
     "x-logo": {
       "url": "https://gestionaleamica.com/assets/img/Logo_Amica_Scritta.png",
       "altText": "Amica: tutto il software che serve per gestire la tua azienda"
@@ -409,7 +409,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -880,7 +880,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -1758,7 +1758,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -2229,7 +2229,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -2865,7 +2865,7 @@
         "tags": [
           "AreaGeografica"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -3071,7 +3071,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -3542,7 +3542,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -4178,7 +4178,7 @@
         "tags": [
           "Articolo"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -4670,7 +4670,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -5141,7 +5141,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -5777,7 +5777,7 @@
         "tags": [
           "ArticoloMediaFile"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -6345,7 +6345,7 @@
         "tags": [
           "BeneServizio"
         ],
-        "summary": "Calcola gli importi di un Amica.BeneServizio (vedi Amica.BeneServizioComputeResult), considerando parametri come quantità movimentata, IVA applicata, eventuali sconti.",
+        "summary": "Calcola gli importi di un `BeneServizio` (vedi `BeneServizioComputeResult`), considerando parametri come quantità movimentata, IVA applicata, eventuali sconti.",
         "parameters": [
           {
             "name": "companyId",
@@ -6904,7 +6904,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -7375,7 +7375,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -8196,7 +8196,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -8667,7 +8667,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -9303,7 +9303,7 @@
         "tags": [
           "CastellettoIva"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -9692,7 +9692,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -10163,7 +10163,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -10799,7 +10799,7 @@
         "tags": [
           "CategoriaAnagrafica"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -11005,7 +11005,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -11476,7 +11476,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -12112,7 +12112,7 @@
         "tags": [
           "CategoriaMerceologica"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -12318,7 +12318,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -12789,7 +12789,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -13425,7 +13425,7 @@
         "tags": [
           "CausaleDocumento"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -13631,7 +13631,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -14102,7 +14102,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -14738,7 +14738,7 @@
         "tags": [
           "CausaleIva"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -14944,7 +14944,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -15415,7 +15415,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -16051,7 +16051,7 @@
         "tags": [
           "CausaleMagazzino"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -16536,7 +16536,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -17007,7 +17007,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -17643,7 +17643,7 @@
         "tags": [
           "ContoContabile"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -17849,7 +17849,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -18320,7 +18320,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -18956,7 +18956,7 @@
         "tags": [
           "DistintaBase"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -19104,7 +19104,7 @@
           "Documento"
         ],
         "summary": "Emette un documento.",
-        "description": "A seconda del tipo di documento, l'emissione comporta una serie di operazioni amministrative e contabili:\n\n\n            1) Aggiornamento dell'Amica.Anagrafica coinvolta (fatturato, numero fatture, ecc.);\n\n            2) Creazione della registrazione contabile di emissione;\n\n            3) Creazione delle scadenze attive o passive, in base al tipo di pagamento;\n\n            4) Eventuale autoproduzione dei beni fatturati tramite distinta base, se l'opzione è attiva;\n\n            5) Creazione del movimento di magazzino;\n\n            6) Aggiornamento delle giacenze dei beni coinvolti, nei rispettivi magazzini;\n\n            7) Aggiornamento di eventuali ordini collegati.\n\n\n            Un documento già emesso non può essere riemesso. Alcuni tipi di documento non supportano l'emissione (ordini e preventivi, ad esempio).",
+        "description": "A seconda del tipo di documento, l'emissione comporta una serie di operazioni amministrative e contabili:\n\n\n            1) Aggiornamento dell'`Anagrafica` coinvolta (fatturato, numero fatture, ecc.);\n\n            2) Creazione della registrazione contabile di emissione;\n\n            3) Creazione delle scadenze attive o passive, in base al tipo di pagamento;\n\n            4) Eventuale autoproduzione dei beni fatturati tramite distinta base, se l'opzione è attiva;\n\n            5) Creazione del movimento di magazzino;\n\n            6) Aggiornamento delle giacenze dei beni coinvolti, nei rispettivi magazzini;\n\n            7) Aggiornamento di eventuali ordini collegati.\n\n\n            Un documento già emesso non può essere riemesso. Alcuni tipi di documento non supportano l'emissione (ordini e preventivi, ad esempio).",
         "parameters": [
           {
             "name": "version",
@@ -21811,7 +21811,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -22282,7 +22282,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -23263,7 +23263,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -23734,7 +23734,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -24370,7 +24370,7 @@
         "tags": [
           "DocumentoMediaFile"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -24518,7 +24518,7 @@
           "FatturaElettronicaXml"
         ],
         "summary": "Invia una o più fatture al Sistema di Interscambio (SDI).",
-        "description": "Il <a href=\"https://gestionaleamica.com/Software/ServizioInterscambioFatture\">Servizio di Interscambio Documenti</a> deve essere attivo per l'azienda e la relativa chiave di attivazione deve essere presente in !:ImpostazioniSdi.SdiApiKey.",
+        "description": "Il <a href=\"https://gestionaleamica.com/Software/ServizioInterscambioFatture\">Servizio di Interscambio Documenti</a> deve essere attivo per l'azienda e la relativa chiave di attivazione deve essere presente in `SdiApiKey`.",
         "parameters": [
           {
             "name": "version",
@@ -24763,7 +24763,7 @@
           "FatturaElettronicaXml"
         ],
         "summary": "Scarica le nuove fatture dal Sistema di Interscambio (SDI).",
-        "description": "Il <a href=\"https://gestionaleamica.com/Software/ServizioInterscambioFatture\">Servizio di Interscambio Documenti</a> deve essere attivo per l'azienda e la relativa chiave di attivazione deve essere presente in !:ImpostazioniSdi.SdiApiKey.",
+        "description": "Il <a href=\"https://gestionaleamica.com/Software/ServizioInterscambioFatture\">Servizio di Interscambio Documenti</a> deve essere attivo per l'azienda e la relativa chiave di attivazione deve essere presente in `SdiApiKey`.",
         "parameters": [
           {
             "name": "version",
@@ -25174,7 +25174,7 @@
                   },
                   "DocumentoId": {
                     "type": "integer",
-                    "description": "Identificativo del Amica.Documento da abbinare.",
+                    "description": "Identificativo del `Documento` da abbinare.",
                     "format": "int32",
                     "example": 1
                   },
@@ -27410,7 +27410,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -27881,7 +27881,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -28517,7 +28517,7 @@
         "tags": [
           "FatturaElettronicaXml"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -28723,7 +28723,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -29194,7 +29194,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -29830,7 +29830,7 @@
         "tags": [
           "FatturaElettronicaXmlTemplate"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -30219,7 +30219,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -30690,7 +30690,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -31326,7 +31326,7 @@
         "tags": [
           "Giacenza"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -31532,7 +31532,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -32003,7 +32003,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -32639,7 +32639,7 @@
         "tags": [
           "GiornaleMagazzino"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -32845,7 +32845,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -33316,7 +33316,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -33952,7 +33952,7 @@
         "tags": [
           "GruppoMerceologico"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -34158,7 +34158,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -34629,7 +34629,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -35265,7 +35265,7 @@
         "tags": [
           "Indirizzo"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -35471,7 +35471,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -35942,7 +35942,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -36578,7 +36578,7 @@
         "tags": [
           "Listino"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -36784,7 +36784,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -37255,7 +37255,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -37891,7 +37891,7 @@
         "tags": [
           "Magazzino"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -38097,7 +38097,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -38568,7 +38568,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -39204,7 +39204,7 @@
         "tags": [
           "Marca"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -39593,7 +39593,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -40064,7 +40064,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -40700,7 +40700,7 @@
         "tags": [
           "ModalitaPagamento"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -40906,7 +40906,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -41377,7 +41377,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -42013,7 +42013,7 @@
         "tags": [
           "ModelloContabile"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -42219,7 +42219,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -42690,7 +42690,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -43326,7 +43326,7 @@
         "tags": [
           "MovimentoMerce"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -43841,7 +43841,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -44312,7 +44312,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -44948,7 +44948,7 @@
         "tags": [
           "Nazione"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -45337,7 +45337,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -45808,7 +45808,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -46444,7 +46444,7 @@
         "tags": [
           "Pagamento"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -46650,7 +46650,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -47121,7 +47121,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -47757,7 +47757,7 @@
         "tags": [
           "Preferenze"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -47963,7 +47963,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -48434,7 +48434,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -49070,7 +49070,7 @@
         "tags": [
           "Prestazione"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -49276,7 +49276,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -49747,7 +49747,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -50383,7 +50383,7 @@
         "tags": [
           "Prezzo"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -50589,7 +50589,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -51060,7 +51060,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -51696,7 +51696,7 @@
         "tags": [
           "Produttore"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -51902,7 +51902,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -52373,7 +52373,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -53009,7 +53009,7 @@
         "tags": [
           "ProgressivoInvio"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -53380,7 +53380,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -53851,7 +53851,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -54487,7 +54487,7 @@
         "tags": [
           "RegistrazioneContabile"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -54693,7 +54693,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -55164,7 +55164,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -55800,7 +55800,7 @@
         "tags": [
           "Reparto"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -56006,7 +56006,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -56477,7 +56477,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -57113,7 +57113,7 @@
         "tags": [
           "RisorsaFinanziaria"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -57650,7 +57650,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -58121,7 +58121,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -59219,7 +59219,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -59690,7 +59690,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -60326,7 +60326,7 @@
         "tags": [
           "Spesa"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -60680,7 +60680,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -61151,7 +61151,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -61846,7 +61846,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -62317,7 +62317,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -62953,7 +62953,7 @@
         "tags": [
           "Taglia"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -63159,7 +63159,7 @@
         },
         "responses": {
           "201": {
-            "description": "Creato. Restituisce l'elemento salvato con il Amica.BaseEntity.ConcurrencyToken aggiornato.",
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -63630,7 +63630,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di Amica.BaseEntity.ConcurrencyToken.",
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -64266,7 +64266,7 @@
         "tags": [
           "Valuta"
         ],
-        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di Amica.Documento avrà il\nAmica.Documento.Numero appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
         "parameters": [
           {
             "name": "version",
@@ -64480,7 +64480,7 @@
           },
           "nazioneId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.Nazione (nazione).",
+            "description": "Identificativo univoco di `Nazione` (nazione).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64490,7 +64490,7 @@
           },
           "areaGeograficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.AreaGeografica (area geografica).",
+            "description": "Identificativo univoco di `AreaGeografica` (area geografica).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64500,7 +64500,7 @@
           },
           "valutaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.Valuta (valuta).",
+            "description": "Identificativo univoco di `Valuta` (valuta).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64510,7 +64510,7 @@
           },
           "indirizzoPredefinitoId": {
             "type": "integer",
-            "description": "Identificativo univoco dell'Amica.Indirizzo (indirizzo) predefinito.",
+            "description": "Identificativo univoco dell'`Indirizzo` (indirizzo) predefinito.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64520,7 +64520,7 @@
             "items": {
               "$ref": "#/components/schemas/Indirizzo"
             },
-            "description": "Elenco degli Amica.Indirizzo dell'anagrafica.",
+            "description": "Elenco degli `Indirizzo` dell'anagrafica.",
             "nullable": true
           },
           "schedaCliente": {
@@ -64626,7 +64626,7 @@
             "maxLength": 30,
             "minLength": 0,
             "type": "string",
-            "description": "Partita IVA.",
+            "description": "Partita IVA. La correttezza formale è verificata dal servizio al salvataggio: l'errore che ne deriva è\nforzabile con `validationOverride`.",
             "nullable": true,
             "example": "IT01234567890"
           },
@@ -64634,7 +64634,7 @@
             "maxLength": 20,
             "minLength": 0,
             "type": "string",
-            "description": "Codice fiscale. Solitamente diverso dalla Amica.Anagrafica.PartitaIva.",
+            "description": "Codice fiscale. Solitamente diverso dalla `PartitaIva`. Come per la partita IVA, la correttezza\nformale è verificata dal servizio al salvataggio e l'errore è forzabile con `validationOverride`.",
             "nullable": true,
             "example": "RSSMRA85M01H501Z"
           },
@@ -64923,7 +64923,7 @@
           },
           "categoriaMerceologicaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.Articolo.CategoriaMerceologica (categoria merceologica).",
+            "description": "Identificativo univoco della `CategoriaMerceologica` (categoria merceologica).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64933,7 +64933,7 @@
           },
           "gruppoMerceologicoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.Articolo.GruppoMerceologico (gruppo merceologico).",
+            "description": "Identificativo univoco del `GruppoMerceologico` (gruppo merceologico).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64943,7 +64943,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.Articolo.CausaleIva (causale IVA).\nId univoco della <a href=\"#tag/CausaleIva\">causale IVA</a> predefinita per l'articolo.",
+            "description": "Identificativo univoco della `CausaleIva` (causale IVA).\nId univoco della <a href=\"#tag/CausaleIva\">causale IVA</a> predefinita per l'articolo.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64953,7 +64953,7 @@
           },
           "tagliaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.Articolo.Taglia (taglia).",
+            "description": "Identificativo univoco della `Taglia` (taglia).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64963,7 +64963,7 @@
           },
           "marcaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.Articolo.Marca.",
+            "description": "Identificativo univoco della `Marca`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64973,7 +64973,7 @@
           },
           "produttoreId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.Articolo.Produttore (produttore).",
+            "description": "Identificativo univoco del `Produttore` (produttore).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -64983,7 +64983,7 @@
           },
           "repartoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.Articolo.Reparto (reparto).",
+            "description": "Identificativo univoco del `Reparto` (reparto).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65167,7 +65167,7 @@
           },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Articolo.",
+            "description": "Identificativo univoco di `Articolo`.",
             "format": "int32",
             "example": 1
           },
@@ -65357,13 +65357,16 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.Documento (documento).",
+            "description": "Identificativo univoco del `Documento` (documento).",
             "format": "int32",
             "example": 1
           },
+          "documento": {
+            "$ref": "#/components/schemas/Documento"
+          },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco dell'Amica.BeneServizio.Articolo (articolo o prodotto).",
+            "description": "Identificativo univoco dell'`Articolo` (articolo o prodotto).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65373,7 +65376,7 @@
           },
           "prestazioneId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.BeneServizio.Prestazione (prestazione).",
+            "description": "Identificativo univoco della `Prestazione` (prestazione).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65383,7 +65386,7 @@
           },
           "magazzinoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.BeneServizio.Magazzino (magazzino). Obbligatorio quando viene usato Amica.BeneServizio.Codice.",
+            "description": "Identificativo univoco del `Magazzino` (magazzino). Obbligatorio quando viene usato `Codice`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65393,7 +65396,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.BeneServizio.CausaleIva.",
+            "description": "Identificativo univoco della `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65403,7 +65406,7 @@
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.BeneServizio.Listino (listino).",
+            "description": "Identificativo univoco del `Listino` (listino).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65413,21 +65416,21 @@
           },
           "ordineId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.Documento (ordine).",
+            "description": "Identificativo univoco del `Documento` (ordine).",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "beneServizioOrdineId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.BeneServizio (bene o servizio) all'interno dell'ordine referenziato da Amica.BeneServizio.OrdineId.",
+            "description": "Identificativo univoco del `BeneServizio` (bene o servizio) all'interno dell'ordine referenziato da `OrdineId`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "tagliaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.BeneServizio.Taglia (taglia).",
+            "description": "Identificativo univoco della `Taglia` (taglia).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65496,21 +65499,21 @@
           },
           "sconto2": {
             "type": "number",
-            "description": "Secondo sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizio.Sconto1",
+            "description": "Secondo sconto percentuale, applicato dopo l'applicazione di `Sconto1`",
             "format": "double",
             "nullable": true,
             "example": 3.0
           },
           "sconto3": {
             "type": "number",
-            "description": "Terzo sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizio.Sconto2",
+            "description": "Terzo sconto percentuale, applicato dopo l'applicazione di `Sconto2`",
             "format": "double",
             "nullable": true,
             "example": 2.0
           },
           "sconto4": {
             "type": "number",
-            "description": "Quarto sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizio.Sconto3",
+            "description": "Quarto sconto percentuale, applicato dopo l'applicazione di `Sconto3`",
             "format": "double",
             "nullable": true,
             "example": 1.0
@@ -65538,7 +65541,7 @@
           },
           "prezzoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.BeneServizio.Prezzo (prezzo).",
+            "description": "Identificativo univoco del `Prezzo` (prezzo).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65566,7 +65569,7 @@
           },
           "importo": {
             "type": "number",
-            "description": "Importo, determinato come prodotto di Amica.BeneServizio.Quantità e Amica.BeneServizio.PrezzoScontato.",
+            "description": "Importo, determinato come prodotto di `Quantità` e `PrezzoScontato`.",
             "format": "double",
             "nullable": true,
             "example": 115.00
@@ -65590,19 +65593,19 @@
         "properties": {
           "ivaEsclusa": {
             "type": "boolean",
-            "description": "Indica se il calcolo debba essere effettuato a partire da Amica.BeneServizioComputeData.Prezzo o da Amica.BeneServizioComputeData.PrezzoIvato.",
+            "description": "Indica se il calcolo debba essere effettuato a partire da `Prezzo` o da `PrezzoIvato`.",
             "example": true
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Listino.",
+            "description": "Identificativo univoco di `Listino`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -65633,19 +65636,19 @@
           },
           "sconto2": {
             "type": "number",
-            "description": "Secondo sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizioComputeData.Sconto1",
+            "description": "Secondo sconto percentuale, applicato dopo l'applicazione di `Sconto1`",
             "format": "double",
             "example": 0.0
           },
           "sconto3": {
             "type": "number",
-            "description": "Terzo sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizioComputeData.Sconto2",
+            "description": "Terzo sconto percentuale, applicato dopo l'applicazione di `Sconto2`",
             "format": "double",
             "example": 0.0
           },
           "sconto4": {
             "type": "number",
-            "description": "Quarto sconto percentuale, applicato dopo l'applicazione di Amica.BeneServizioComputeData.Sconto3",
+            "description": "Quarto sconto percentuale, applicato dopo l'applicazione di `Sconto3`",
             "format": "double",
             "example": 0.0
           },
@@ -65657,7 +65660,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Utilizzato dal metodo di calcolo M:Amica.BeneServizioService.Compute(Amica.BeneServizioComputeData,Amica.RequestSettings) di `BeneServizioService`."
+        "description": "Utilizzato dal metodo di calcolo `Compute` di `BeneServizioService`."
       },
       "BeneServizioComputeResult": {
         "type": "object",
@@ -65682,14 +65685,14 @@
           },
           "importo": {
             "type": "number",
-            "description": "Importo, determinato come prodotto tra Amica.BeneServizio.Quantità e Amica.BeneServizio.PrezzoScontato.",
+            "description": "Importo, determinato come prodotto tra `Quantità` e `PrezzoScontato`.",
             "format": "double",
             "nullable": true,
             "example": 1187.50
           }
         },
         "additionalProperties": false,
-        "description": "Restituito dal metodo M:Amica.BeneServizioService.Compute(Amica.BeneServizioComputeData,Amica.RequestSettings) di `BeneServizioServizio`."
+        "description": "Restituito dal metodo `Compute` di `BeneServizioServizio`."
       },
       "CassaPrevidenziale": {
         "type": "object",
@@ -65727,7 +65730,7 @@
           },
           "registrazioneContabileId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.CastellettoIva.RegistrazioneContabile (registrazione contabile).",
+            "description": "Identificativo univoco di `RegistrazioneContabile` (registrazione contabile).",
             "format": "int32",
             "example": 1
           },
@@ -65736,7 +65739,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.CastellettoIva.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "example": 1
           },
@@ -65782,7 +65785,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Importo IVA a debito associato a una Amica.CastellettoIva.RegistrazioneContabile."
+        "description": "Importo IVA a debito associato a una `RegistrazioneContabile`."
       },
       "CategoriaAnagrafica": {
         "required": [
@@ -66047,7 +66050,7 @@
           },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco dell'Amica.Componente.Articolo da comporre.",
+            "description": "Identificativo univoco dell'`Articolo` da comporre.",
             "format": "int32",
             "example": 1
           },
@@ -66071,7 +66074,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Componente (distinta base). Può essere incluso in Amica.Articolo.DistintaBase."
+        "description": "Componente (distinta base). Può essere incluso in `DistintaBase`."
       },
       "ContoContabile": {
         "type": "object",
@@ -66090,7 +66093,7 @@
           },
           "bancaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Banca.",
+            "description": "Identificativo univoco di `Banca`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -66142,7 +66145,7 @@
           },
           "conto": {
             "type": "string",
-            "description": "Numero di conto (ad es. \"100.20\"). Sono supportati fino a 5 livelli. Il valore è ricavato da Amica.ContoContabile.Raw.",
+            "description": "Numero di conto (ad es. \"100.20\"). Sono supportati fino a 5 livelli. Il valore è ricavato da `Raw`.",
             "nullable": true,
             "readOnly": true,
             "example": "100.20"
@@ -66156,7 +66159,7 @@
         "properties": {
           "contoId": {
             "type": "integer",
-            "description": "Identificativo univoco del Amica.ContoContabile.",
+            "description": "Identificativo univoco del `ContoContabile`.",
             "format": "int32",
             "example": 1
           },
@@ -66186,7 +66189,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Contiene l'esito della validazione di un conto (Amica.ContoContabile)."
+        "description": "Contiene l'esito della validazione di un conto (`ContoContabile`)."
       },
       "CreditoDebitoMensile": {
         "type": "object",
@@ -66503,7 +66506,7 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32"
           },
           "anagrafica": {
@@ -66511,7 +66514,7 @@
           },
           "causaleDocumentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.CausaleDocumento.",
+            "description": "Identificativo univoco di `CausaleDocumento`.",
             "format": "int32",
             "nullable": true
           },
@@ -66520,7 +66523,7 @@
           },
           "agenteId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.Anagrafica dell'agente.",
+            "description": "Identificativo univoco di `Anagrafica` dell'agente.",
             "format": "int32",
             "nullable": true
           },
@@ -66529,7 +66532,7 @@
           },
           "pagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.Pagamento.",
+            "description": "Identificativo univoco di `Pagamento`.",
             "format": "int32",
             "nullable": true
           },
@@ -66538,7 +66541,7 @@
           },
           "vettoreId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.Anagrafica del vettore.",
+            "description": "Identificativo univoco di `Anagrafica` del vettore.",
             "format": "int32",
             "nullable": true
           },
@@ -66562,7 +66565,7 @@
           },
           "destinazioneId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Indirizzo di destinazione.",
+            "description": "Identificativo univoco di `Indirizzo` di destinazione.",
             "format": "int32",
             "nullable": true
           },
@@ -66571,7 +66574,7 @@
           },
           "valutaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.Valuta.",
+            "description": "Identificativo univoco di `Valuta`.",
             "format": "int32",
             "nullable": true
           },
@@ -66580,7 +66583,7 @@
           },
           "causaleMagazzinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.CausaleMagazzino.",
+            "description": "Identificativo univoco di `CausaleMagazzino`.",
             "format": "int32",
             "nullable": true
           },
@@ -66712,7 +66715,7 @@
           },
           "contatto": {
             "type": "integer",
-            "description": "Persona di contatto preferita, Amica.AnagraficaNominativo1 oppure Amica.AnagraficaNominativo2.",
+            "description": "Persona di contatto preferita, `AnagraficaNominativo1` oppure `AnagraficaNominativo2`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -66813,7 +66816,7 @@
           },
           "cambio": {
             "type": "number",
-            "description": "Tasso di cambio rispetto all'Euro, nel caso in cui la Amica.Documento.Valuta del documento non sia l'Euro.",
+            "description": "Tasso di cambio rispetto all'Euro, nel caso in cui la `Valuta` del documento non sia l'Euro.",
             "format": "double",
             "example": 1.0
           },
@@ -66845,73 +66848,73 @@
           },
           "iva1Imponibile": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva1CausaleIva",
+            "description": "Totale imponibile attribuibile a `Iva1CausaleIva`",
             "format": "double",
             "example": 1000.00
           },
           "iva2Imponibile": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva2CausaleIva",
+            "description": "Totale imponibile attribuibile a `Iva2CausaleIva`",
             "format": "double",
             "example": 500.00
           },
           "iva3Imponibile": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva3CausaleIva",
+            "description": "Totale imponibile attribuibile a `Iva3CausaleIva`",
             "format": "double",
             "example": 0.00
           },
           "iva4Imponibile": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva4CausaleIva",
+            "description": "Totale imponibile attribuibile a `Iva4CausaleIva`",
             "format": "double",
             "example": 0.00
           },
           "iva1ImponibileLordo": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva1CausaleIva al lordo di eventuali sconti di fattura.",
+            "description": "Totale imponibile attribuibile a `Iva1CausaleIva` al lordo di eventuali sconti di fattura.",
             "format": "double",
             "example": 1050.00
           },
           "iva2ImponibileLordo": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva2CausaleIva al lordo di eventuali sconti di fattura.",
+            "description": "Totale imponibile attribuibile a `Iva2CausaleIva` al lordo di eventuali sconti di fattura.",
             "format": "double",
             "example": 525.00
           },
           "iva3ImponibileLordo": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva3CausaleIva al lordo di eventuali sconti di fattura.",
+            "description": "Totale imponibile attribuibile a `Iva3CausaleIva` al lordo di eventuali sconti di fattura.",
             "format": "double",
             "example": 0.00
           },
           "iva4ImponibileLordo": {
             "type": "number",
-            "description": "Totale imponibile attribuibile a Amica.Documento.Iva4CausaleIva al lordo di eventuali sconti di fattura.",
+            "description": "Totale imponibile attribuibile a `Iva4CausaleIva` al lordo di eventuali sconti di fattura.",
             "format": "double",
             "example": 0.00
           },
           "iva1Imposta": {
             "type": "number",
-            "description": "Totale imposta per Amica.Documento.Iva1CausaleIva",
+            "description": "Totale imposta per `Iva1CausaleIva`",
             "format": "double",
             "example": 220.00
           },
           "iva2Imposta": {
             "type": "number",
-            "description": "Totale imposta per Amica.Documento.Iva2CausaleIva",
+            "description": "Totale imposta per `Iva2CausaleIva`",
             "format": "double",
             "example": 50.00
           },
           "iva3Imposta": {
             "type": "number",
-            "description": "Totale imposta per Amica.Documento.Iva3CausaleIva",
+            "description": "Totale imposta per `Iva3CausaleIva`",
             "format": "double",
             "example": 0.00
           },
           "iva4Imposta": {
             "type": "number",
-            "description": "Totale imposta per Amica.Documento.Iva4CausaleIva",
+            "description": "Totale imposta per `Iva4CausaleIva`",
             "format": "double",
             "example": 0.00
           },
@@ -67051,7 +67054,7 @@
           },
           "numero": {
             "type": "string",
-            "description": "Numero completo del documento. Ad esempio, `99/bis`. Generato a partire da Amica.Documento.NumeroParteNumerica e Amica.Documento.NumeroParteTesto. Nota bene: proprietà valorizzata solo nel caso di un'istanza salvata sul backend.",
+            "description": "Numero completo del documento. Ad esempio, `99/bis`. Generato a partire da `NumeroParteNumerica` e `NumeroParteTesto`. Nota bene: proprietà valorizzata solo nel caso di un'istanza salvata sul backend.",
             "nullable": true,
             "example": "42/bis"
           },
@@ -67199,7 +67202,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Utilizzato dal metodo M:Amica.DocumentoService.Compute(Amica.DocumentoComputeData,Amica.RequestSettings,System.Boolean) di `DocumentoService`."
+        "description": "Utilizzato dal metodo `Compute` di `DocumentoService`."
       },
       "DocumentoComputeDataBeneServizio": {
         "type": "object",
@@ -67356,7 +67359,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Restituito dal metodo M:Amica.DocumentoService.Compute(Amica.DocumentoComputeData,Amica.RequestSettings,System.Boolean) di `DocumentoService`."
+        "description": "Restituito dal metodo `Compute` di `DocumentoService`."
       },
       "DocumentoComputeResultRiepilogoIva": {
         "type": "object",
@@ -67387,7 +67390,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "example": 1
           },
@@ -67446,7 +67449,7 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "example": 1
           }
@@ -67463,7 +67466,7 @@
               "type": "integer",
               "format": "int32"
             },
-            "description": "Identificativi dei Amica.Documento da esportare.",
+            "description": "Identificativi dei `Documento` da esportare.",
             "nullable": true
           }
         },
@@ -67481,7 +67484,7 @@
           },
           "valido": {
             "type": "boolean",
-            "description": "Indica se la fattura elettronica (XML) generata ha superato il test di validazione secondo le specifiche del Sistema di Interscambio (SdI). Se `false`, vedi Amica.FatturaElettronicaExportResult.Errori per l'elenco degli errori di validazione.",
+            "description": "Indica se la fattura elettronica (XML) generata ha superato il test di validazione secondo le specifiche del Sistema di Interscambio (SdI). Se `false`, vedi `Errori` per l'elenco degli errori di validazione.",
             "readOnly": true,
             "example": true
           },
@@ -67500,14 +67503,14 @@
           }
         },
         "additionalProperties": false,
-        "description": "Esito della chiamata al metodo M:Amica.FatturaElettronicaXmlService.XmlExport(Amica.FatturaElettronicaExportOptions,Amica.RequestSettings) di `FatturaElettronicaXmlService`."
+        "description": "Esito della chiamata al metodo `XmlExport` di `FatturaElettronicaXmlService`."
       },
       "FatturaElettronicaImportResult": {
         "type": "object",
         "properties": {
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -67534,7 +67537,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Esito della chiamata al metodo M:Amica.FatturaElettronicaXmlService.XmlImport(Amica.FatturaElettronicaImportOptions,System.Byte[],System.String,Amica.RequestSettings) di `FatturaElettronicaXmlService`."
+        "description": "Esito della chiamata al metodo `XmlImport` di `FatturaElettronicaXmlService`."
       },
       "FatturaElettronicaUploadOptions": {
         "type": "object",
@@ -67574,7 +67577,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Esito della chiamata al metodo M:Amica.FatturaElettronicaXmlService.SdiUpload(Amica.FatturaElettronicaUploadOptions,Amica.RequestSettings) di `FatturaElettronicaXmlService`."
+        "description": "Esito della chiamata al metodo `SdiUpload` di `FatturaElettronicaXmlService`."
       },
       "FatturaElettronicaXml": {
         "type": "object",
@@ -67651,14 +67654,14 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.FatturaElettronicaXml. In alternativa, valorizzare Amica.FatturaElettronicaXmlStyleSheetData.FileName.",
+            "description": "Identificativo univoco di `FatturaElettronicaXml`. In alternativa, valorizzare `FileName`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "fileName": {
             "type": "string",
-            "description": "Nome del file XML. Se presente, ha la precedenza su Amica.FatturaElettronicaXmlStyleSheetData.Id.",
+            "description": "Nome del file XML. Se presente, ha la precedenza su `Id`.",
             "nullable": true,
             "example": "IT01234567890_00001.xml"
           },
@@ -67673,7 +67676,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Opzioni per la chiamata al metodo M:Amica.FatturaElettronicaXmlService.ApplyStyleSheet(Amica.FatturaElettronicaXmlStyleSheetData,Amica.RequestSettings) di `FatturaElettronicaXmlService`."
+        "description": "Opzioni per la chiamata al metodo `ApplyStyleSheet` di `FatturaElettronicaXmlService`."
       },
       "FatturaElettronicaXmlTemplate": {
         "type": "object",
@@ -67956,7 +67959,7 @@
           },
           "magazzinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Giacenza.Magazzino.",
+            "description": "Identificativo univoco di `Magazzino`.",
             "format": "int32",
             "example": 1
           },
@@ -67965,7 +67968,7 @@
           },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Giacenza.Articolo.",
+            "description": "Identificativo univoco di `Articolo`.",
             "format": "int32",
             "example": 1
           },
@@ -68160,7 +68163,7 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "example": 1
           },
@@ -68273,7 +68276,7 @@
           },
           "fornitoreId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica (fornitore).",
+            "description": "Identificativo univoco di `Anagrafica` (fornitore).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68283,7 +68286,7 @@
           },
           "valutaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Listino.Valuta (valuta).",
+            "description": "Identificativo univoco di `Valuta` (valuta).",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68619,7 +68622,7 @@
           },
           "modelloContabileId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.ModelloContabile.",
+            "description": "Identificativo univoco di `ModelloContabile`.",
             "format": "int32",
             "example": 1
           },
@@ -68656,7 +68659,7 @@
               "Abbuono"
             ],
             "type": "string",
-            "description": "Cosa rappresenta Amica.ModelloContabileRiga.Importo."
+            "description": "Cosa rappresenta `Importo`."
           },
           "segnoContabile": {
             "enum": [
@@ -68668,7 +68671,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Riga di un Amica.ModelloContabile."
+        "description": "Riga di un `ModelloContabile`."
       },
       "MovimentoMerce": {
         "type": "object",
@@ -68687,7 +68690,7 @@
           },
           "modalitaPagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerce.ModalitaPagamento.",
+            "description": "Identificativo univoco di `ModalitaPagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68697,7 +68700,7 @@
           },
           "causaleMagazzinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerce.CausaleMagazzino.",
+            "description": "Identificativo univoco di `CausaleMagazzino`.",
             "format": "int32",
             "example": 1
           },
@@ -68706,7 +68709,7 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerce.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68716,7 +68719,7 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68790,13 +68793,13 @@
           },
           "movimentoMerceId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerce.",
+            "description": "Identificativo univoco di `MovimentoMerce`.",
             "format": "int32",
             "example": 1
           },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerceRiga.Articolo.",
+            "description": "Identificativo univoco di `Articolo`.",
             "format": "int32",
             "example": 1
           },
@@ -68805,20 +68808,20 @@
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Listino.",
+            "description": "Identificativo univoco di `Listino`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "magazzinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Magazzino.",
+            "description": "Identificativo univoco di `Magazzino`.",
             "format": "int32",
             "example": 1
           },
           "prezzoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerceRiga.Prezzo.",
+            "description": "Identificativo univoco di `Prezzo`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68828,7 +68831,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerceRiga.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68838,7 +68841,7 @@
           },
           "tagliaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.MovimentoMerceRiga.Taglia.",
+            "description": "Identificativo univoco di `Taglia`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -68999,7 +69002,7 @@
           },
           "modalitaPagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Pagamento.ModalitaPagamento.",
+            "description": "Identificativo univoco di `ModalitaPagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69009,7 +69012,7 @@
           },
           "spesaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Pagamento.Spesa.",
+            "description": "Identificativo univoco di `Spesa`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69019,7 +69022,7 @@
           },
           "risorsaFinanziariaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Pagamento.RisorsaFinanziaria.",
+            "description": "Identificativo univoco di `RisorsaFinanziaria`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69067,13 +69070,13 @@
           },
           "inizioScadenze": {
             "type": "integer",
-            "description": "Periodicità della prima rata. Per le successive, impostare Amica.Pagamento.Periodicità.",
+            "description": "Periodicità della prima rata. Per le successive, impostare `Periodicità`.",
             "format": "int32",
             "example": 30
           },
           "periodicità": {
             "type": "integer",
-            "description": "Periodicità delle rate successive alla prima. Per la prima rata, impostare Amica.Pagamento.InizioScadenze. Default impostato a 30.",
+            "description": "Periodicità delle rate successive alla prima. Per la prima rata, impostare `InizioScadenze`. Default impostato a 30.",
             "format": "int32",
             "example": 30
           },
@@ -69129,7 +69132,7 @@
           },
           "causaleDocumentoId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.CausaleDocumento del documento generato.",
+            "description": "Identificativo univoco della `CausaleDocumento` del documento generato.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69323,28 +69326,28 @@
           },
           "causaleProduzioneComponentiId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.CausaleMagazzino\nIdentificativo univoco della Amica.CausaleMagazzino da usare nella produzione di componenti.",
+            "description": "Identificativo univoco di `CausaleMagazzino`\nIdentificativo univoco della `CausaleMagazzino` da usare nella produzione di componenti.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "causaleProduzioneCompostiId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.CausaleMagazzino da usare per gli articoli composti nella produzione di componenti.",
+            "description": "Identificativo univoco della `CausaleMagazzino` da usare per gli articoli composti nella produzione di componenti.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "causaleMagazzinoVenditaId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.CausaleMagazzino da usare nei documenti di vendita.",
+            "description": "Identificativo univoco della `CausaleMagazzino` da usare nei documenti di vendita.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "causaleMagazzinoAcquistoId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.CausaleMagazzino da usare nei documenti di acquisto.",
+            "description": "Identificativo univoco della `CausaleMagazzino` da usare nei documenti di acquisto.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69356,7 +69359,7 @@
             "maxLength": 5,
             "minLength": 0,
             "type": "string",
-            "description": "Eventuali scadenze che cadono in questa data verranno posticipate del numero di giorni indicato da Amica.Preferenze.GiorniExtraDataSpeciale1.",
+            "description": "Eventuali scadenze che cadono in questa data verranno posticipate del numero di giorni indicato da `GiorniExtraDataSpeciale1`.",
             "nullable": true,
             "example": "25/12"
           },
@@ -69364,20 +69367,20 @@
             "maxLength": 5,
             "minLength": 0,
             "type": "string",
-            "description": "Eventuali scadenze che cadono in questa data verranno posticipate del numero di giorni indicato da Amica.Preferenze.GiorniExtraDataSpeciale2.",
+            "description": "Eventuali scadenze che cadono in questa data verranno posticipate del numero di giorni indicato da `GiorniExtraDataSpeciale2`.",
             "nullable": true,
             "example": "15/08"
           },
           "giorniExtraDataSpeciale1": {
             "type": "integer",
-            "description": "Numero di giorni da aggiungere a Amica.Preferenze.DataSpeciale1.",
+            "description": "Numero di giorni da aggiungere a `DataSpeciale1`.",
             "format": "int32",
             "nullable": true,
             "example": 3
           },
           "giorniExtraDataSpeciale2": {
             "type": "integer",
-            "description": "Numero di giorni da aggiungere a Amica.Preferenze.DataSpeciale1.",
+            "description": "Numero di giorni da aggiungere a `DataSpeciale1`.",
             "format": "int32",
             "nullable": true,
             "example": 5
@@ -69389,49 +69392,49 @@
           },
           "causaleMagazzinoMerciId": {
             "type": "integer",
-            "description": "Identificativo della Amica.CausaleMagazzino predefinita nei movimenti merci.",
+            "description": "Identificativo della `CausaleMagazzino` predefinita nei movimenti merci.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "magazzinoMerciId": {
             "type": "integer",
-            "description": "Identificativo del Amica.Magazzino predefinito nei movimenti merci.",
+            "description": "Identificativo del `Magazzino` predefinito nei movimenti merci.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "listinoMerciId": {
             "type": "integer",
-            "description": "Identificativo del Amica.Listino predefinito nei movimenti merci.",
+            "description": "Identificativo del `Listino` predefinito nei movimenti merci.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modalitaPagamentoMerciId": {
             "type": "integer",
-            "description": "Identificativo della Amica.ModalitaPagamento predefinita nei movimenti merci.",
+            "description": "Identificativo della `ModalitaPagamento` predefinita nei movimenti merci.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "documentiCausaleIvaId": {
             "type": "integer",
-            "description": "Identificativo della Amica.CausaleIva predefinita nei documenti fiscali.",
+            "description": "Identificativo della `CausaleIva` predefinita nei documenti fiscali.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "documentiMagazzinoId": {
             "type": "integer",
-            "description": "Identificativo del Amica.Magazzino predefinito nei documenti fiscali.",
+            "description": "Identificativo del `Magazzino` predefinito nei documenti fiscali.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "documentiListinoId": {
             "type": "integer",
-            "description": "Amica.Preferenze.DocumentiListinoId predefinito nei documenti fiscali.",
+            "description": "`DocumentiListinoId` predefinito nei documenti fiscali.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69559,91 +69562,91 @@
           },
           "modelloVenditeNotaDebitoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le note di debito emesse.",
+            "description": "`ModelloContabile` predefinito per le note di debito emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeNotaCreditoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le note di credito emesse.",
+            "description": "`ModelloContabile` predefinito per le note di credito emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeRicevutaFiscaleId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le ricevute fiscali emesse.",
+            "description": "`ModelloContabile` predefinito per le ricevute fiscali emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeFatturaProfessionistaId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture professionisti emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture professionisti emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeFatturaDifferitaId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture differite emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture differite emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeFatturaAccontoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture di acconto emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture di acconto emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiFatturaAccompagnatoriaId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture accompagnatorie fornitori emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture accompagnatorie fornitori emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloVenditeFatturaAccompagnaoriaId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture accompagnatorie emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture accompagnatorie emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiNotaDebitoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le note di debito fornitori emesse.",
+            "description": "`ModelloContabile` predefinito per le note di debito fornitori emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiNotaCreditoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le note di credito emesse.",
+            "description": "`ModelloContabile` predefinito per le note di credito emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiFatturaProfessionistiId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture professionisti fornitori emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture professionisti fornitori emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiFatturaDifferitaId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture differite fornitori emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture differite fornitori emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "modelloAcquistiFatturaAccontoId": {
             "type": "integer",
-            "description": "Amica.ModelloContabile predefinito per le fatture di acconto fornitori emesse.",
+            "description": "`ModelloContabile` predefinito per le fatture di acconto fornitori emesse.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69682,7 +69685,7 @@
           },
           "categoriaMerceologicaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Prestazione.CategoriaMerceologica.",
+            "description": "Identificativo univoco di `CategoriaMerceologica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69692,7 +69695,7 @@
           },
           "gruppoMerceologicoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Prestazione.GruppoMerceologico.",
+            "description": "Identificativo univoco di `GruppoMerceologico`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69702,7 +69705,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Prestazione.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69763,14 +69766,14 @@
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Listino.",
+            "description": "Identificativo univoco di `Listino`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "articoloId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Prezzo.Articolo. In alternativa, usare Amica.Prezzo.PrestazioneId.",
+            "description": "Identificativo univoco di `Articolo`. In alternativa, usare `PrestazioneId`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69780,7 +69783,7 @@
           },
           "prestazioneId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Prezzo.Prestazione. In alternativa, usare Amica.Prezzo.ArticoloId.",
+            "description": "Identificativo univoco di `Prestazione`. In alternativa, usare `ArticoloId`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -69802,25 +69805,25 @@
           },
           "sconto2": {
             "type": "number",
-            "description": "Secondo sconto percentuale, applicato a seguito dell'applicazione di Amica.Prezzo.Sconto1",
+            "description": "Secondo sconto percentuale, applicato a seguito dell'applicazione di `Sconto1`",
             "format": "double",
             "example": 5.00
           },
           "sconto3": {
             "type": "number",
-            "description": "Terzo sconto percentuale, applicato a seguito dell'applicazione di Amica.Prezzo.Sconto2",
+            "description": "Terzo sconto percentuale, applicato a seguito dell'applicazione di `Sconto2`",
             "format": "double",
             "example": 0.00
           },
           "sconto4": {
             "type": "number",
-            "description": "Quarto sconto percentuale, applicato a seguito dell'applicazione di Amica.Prezzo.Sconto3",
+            "description": "Quarto sconto percentuale, applicato a seguito dell'applicazione di `Sconto3`",
             "format": "double",
             "example": 0.00
           },
           "ricarico": {
             "type": "number",
-            "description": "Ricarico (percentuale) da applicare sul costo del prodotto (o della prestazione). Se utilizzato, Amica.Prezzo.Importo viene ignorato.",
+            "description": "Ricarico (percentuale) da applicare sul costo del prodotto (o della prestazione). Se utilizzato, `Importo` viene ignorato.",
             "format": "double",
             "example": 20.00
           },
@@ -69865,6 +69868,10 @@
           "instance": {
             "type": "string",
             "nullable": true
+          },
+          "overridable": {
+            "type": "boolean",
+            "description": "Indica se l'errore è *forzabile*: ripetendo la stessa richiesta con `validationOverride=true` il servizio la accetta nonostante la validazione fallita (tipico delle anomalie formali su dati reali, come la partita IVA di un fornitore estero). È presente su tutte le risposte di errore e vale `false` per gli errori che non ammettono deroga."
           }
         },
         "additionalProperties": { }
@@ -69918,7 +69925,7 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Riferimento a Amica.Documento.",
+            "description": "Riferimento a `Documento`.",
             "format": "int32",
             "example": 1
           },
@@ -70004,21 +70011,21 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "pagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Pagamento.",
+            "description": "Identificativo univoco di `Pagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.RegistrazioneContabile.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70124,13 +70131,13 @@
           },
           "registrazioneContabileId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.RegistrazioneContabile.",
+            "description": "Identificativo univoco di `RegistrazioneContabile`.",
             "format": "int32",
             "example": 1
           },
           "scadenzaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Scadenza.",
+            "description": "Identificativo univoco di `Scadenza`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70144,7 +70151,7 @@
           },
           "emissioneId": {
             "type": "integer",
-            "description": "Identificativo del Amica.Documento di riferimento.",
+            "description": "Identificativo del `Documento` di riferimento.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70233,7 +70240,7 @@
         "properties": {
           "registrazioneId": {
             "type": "integer",
-            "description": "Identificativo univoco della Amica.RegistrazioneContabile.",
+            "description": "Identificativo univoco della `RegistrazioneContabile`.",
             "format": "int32",
             "example": 1
           },
@@ -70259,7 +70266,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Contiene l'esito della validazione di una registrazione contabile (Amica.RegistrazioneContabile)."
+        "description": "Contiene l'esito della validazione di una registrazione contabile (`RegistrazioneContabile`)."
       },
       "Reparto": {
         "type": "object",
@@ -70278,7 +70285,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Reparto.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "example": 1
           },
@@ -70658,7 +70665,7 @@
           },
           "registrazioneContabileId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Scadenza.RegistrazioneContabile.",
+            "description": "Identificativo univoco di `RegistrazioneContabile`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70668,7 +70675,7 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Scadenza.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70678,7 +70685,7 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Scadenza.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70688,7 +70695,7 @@
           },
           "modalitaPagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Scadenza.ModalitaPagamento.",
+            "description": "Identificativo univoco di `ModalitaPagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70824,14 +70831,14 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "agenteId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica dell'agente.",
+            "description": "Identificativo univoco di `Anagrafica` dell'agente.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70841,7 +70848,7 @@
           },
           "pagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaCliente.Pagamento.",
+            "description": "Identificativo univoco di `Pagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70851,7 +70858,7 @@
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaCliente.Listino.",
+            "description": "Identificativo univoco di `Listino`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70861,7 +70868,7 @@
           },
           "categoriaAnagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaCliente.CategoriaAnagrafica.",
+            "description": "Identificativo univoco di `CategoriaAnagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70871,7 +70878,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaCliente.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -70976,7 +70983,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Impostazioni e informazioni di vendita di un'Amica.Anagrafica."
+        "description": "Impostazioni e informazioni di vendita di un'`Anagrafica`."
       },
       "SchedaFornitore": {
         "type": "object",
@@ -70995,14 +71002,14 @@
           },
           "anagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Anagrafica.",
+            "description": "Identificativo univoco di `Anagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
           },
           "pagamentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaFornitore.Pagamento.",
+            "description": "Identificativo univoco di `Pagamento`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71012,7 +71019,7 @@
           },
           "listinoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaFornitore.Listino.",
+            "description": "Identificativo univoco di `Listino`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71022,7 +71029,7 @@
           },
           "capoAreaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaFornitore.CapoArea.",
+            "description": "Identificativo univoco di `CapoArea`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71032,7 +71039,7 @@
           },
           "categoriaAnagraficaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaFornitore.CategoriaAnagrafica.",
+            "description": "Identificativo univoco di `CategoriaAnagrafica`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71042,7 +71049,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SchedaFornitore.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71151,7 +71158,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Impostazioni e informazioni di acquisto di un'Amica.Anagrafica."
+        "description": "Impostazioni e informazioni di acquisto di un'`Anagrafica`."
       },
       "SedeAltra": {
         "type": "object",
@@ -71398,7 +71405,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Spesa.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "nullable": true,
             "example": 1
@@ -71440,13 +71447,13 @@
           },
           "documentoId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.Documento.",
+            "description": "Identificativo univoco di `Documento`.",
             "format": "int32",
             "example": 1
           },
           "spesaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SpesaDocumento.Spesa.",
+            "description": "Identificativo univoco di `Spesa`.",
             "format": "int32",
             "example": 1
           },
@@ -71455,7 +71462,7 @@
           },
           "causaleIvaId": {
             "type": "integer",
-            "description": "Identificativo univoco di Amica.SpesaDocumento.CausaleIva.",
+            "description": "Identificativo univoco di `CausaleIva`.",
             "format": "int32",
             "example": 1
           },
