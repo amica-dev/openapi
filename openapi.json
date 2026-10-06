@@ -7,7 +7,7 @@
       "url": "https://amica.dev",
       "email": "assistenza@gestionaleamica.com"
     },
-    "version": "3.1.4",
+    "version": "3.1.5",
     "x-logo": {
       "url": "https://gestionaleamica.com/assets/img/Logo_Amica_Scritta.png",
       "altText": "Amica: tutto il software che serve per gestire la tua azienda"
@@ -21092,6 +21092,204 @@
         }
       }
     },
+    "/api/v{version}/{companyId}/Documento/totali": {
+      "get": {
+        "tags": [
+          "Documento"
+        ],
+        "summary": "Restituisce i totali dei documenti che soddisfano il filtro, eventualmente raggruppati per mese, anno o\nanagrafica. I totali sono calcolati dal server: per conoscere il fatturato di un periodo non serve scaricare\ni documenti.",
+        "description": "\nLe note di credito, clienti e fornitori, entrano nei totali con segno negativo.\n\nSenza raggruppamento la risposta contiene un solo gruppo, anche se nessun documento soddisfa il filtro.\n            Raggruppando per mese o per anno i gruppi sono in ordine cronologico e `Periodo` ne indica il primo giorno;\n            raggruppando per anagrafica sono in ordine di totale documento decrescente, con `AnagraficaId` e\n            `RagioneSociale`.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Filter",
+            "in": "query",
+            "description": "Condizioni di ricerca che selezionano i documenti da sommare, con la stessa sintassi del parametro `Filter`\ndell'elenco dei documenti. Senza filtro si sommano tutti i documenti dell'azienda, compresi ordini e\npreventivi: per il fatturato, filtrare per classe e tipo di documento.",
+            "schema": {
+              "type": "string",
+              "example": "ClasseDocumento $eq 1, Data $gte 2026-01-01, Data $lte 2026-09-30"
+            },
+            "example": "ClasseDocumento $eq 1, Data $gte 2026-01-01, Data $lte 2026-09-30"
+          },
+          {
+            "name": "Raggruppa",
+            "in": "query",
+            "description": "Come raggruppare i totali: `Nessuno` (un solo gruppo, predefinito), `Mese`, `Anno` o `Anagrafica`.",
+            "schema": {
+              "enum": [
+                "Nessuno",
+                "Mese",
+                "Anno",
+                "Anagrafica"
+              ],
+              "type": "string",
+              "example": "Mese"
+            },
+            "example": "Mese"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce i totali, un elemento per gruppo.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentoTotali"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore (di solito un filtro non valido).",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v{version}/{companyId}/Documento/{documentoId}/newinstancefromtemplate": {
       "post": {
         "tags": [
@@ -34205,6 +34403,210 @@
         }
       }
     },
+    "/api/v{version}/{companyId}/GiornaleMagazzino/distinct": {
+      "get": {
+        "tags": [
+          "GiornaleMagazzino"
+        ],
+        "summary": "Restituisce una lista di elementi distinti.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Selector",
+            "in": "query",
+            "description": "Il campo usato per distinguere gli elementi.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "RagioneSociale1"
+            },
+            "example": "RagioneSociale1"
+          },
+          {
+            "name": "Skip",
+            "in": "query",
+            "description": "Numero di elementi, a partire dal primo, da escludere dal risultato. Combinato con `Take`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 100
+            },
+            "example": 100
+          },
+          {
+            "name": "Take",
+            "in": "query",
+            "description": "Numero di elementi da includere nel risultato. Combinato con `Skip`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 25
+            },
+            "example": 25
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce la lista degli elementi distinti.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DistinctPropertyGroup"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v{version}/{companyId}/GiornaleMagazzino/{id}": {
       "get": {
         "tags": [
@@ -37553,6 +37955,2794 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Indirizzo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/{id}/compute": {
+      "post": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Elabora un inventario senza salvare nulla.",
+        "description": "Calcola una riga per ogni giacenza del magazzino dell'inventario (esclusi gli articoli\n            inattivi, se richiesto), partendo dall'inventario fiscale precedente e applicando i movimenti fino alla\n            data dell'inventario inclusa. Il valore di ogni riga è la quantità per il costo unitario, medio o\n            ultimo secondo la valorizzazione; il costo cambia solo con i carichi di acquisto.\n\n\n            Non scrive nulla: serve come anteprima, o quando basta il conteggio. Il `ConcurrencyToken`\n            restituito, passato a `process`, garantisce che venga salvato esattamente il risultato mostrato.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID univoco dell'inventario da elaborare.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce il risultato dell'elaborazione.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventarioComputeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. L'inventario non ha il magazzino o la data.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. L'inventario non è stato trovato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "422": {
+            "description": "La stessa Idempotency-Key è già stata usata per una richiesta con metodo, URL o corpo diversi."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/{id}/process": {
+      "post": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Elabora un inventario e ne salva le righe.",
+        "description": "Rifà l'elaborazione di `compute` e sostituisce le righe dell'inventario con quelle\n            calcolate. Con `alignStock` riscrive anche la quantità in giacenza di ogni giacenza elaborata,\n            ma solo se nel magazzino non ci sono movimenti successivi alla data dell'inventario. Tutto avviene in\n            un'unica transazione.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID univoco dell'inventario da elaborare.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "concurrencyToken",
+            "in": "query",
+            "description": "Il `ConcurrencyToken` restituito da `compute`. Se indicato e\n            i dati sono cambiati nel frattempo, così che l'elaborazione dia righe diverse, non salva nulla e\n            risponde 422. Se omesso, salva il risultato dell'elaborazione corrente.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "alignStock",
+            "in": "query",
+            "description": "Se allineare le giacenze del magazzino alle quantità dell'inventario\n            (default `true`).",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce il risultato dell'elaborazione salvata.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventarioComputeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. L'inventario non ha il magazzino o la data.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. L'inventario non è stato trovato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Conflitto. I dati sono cambiati dopo `compute`: va ripetuta l'anteprima.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/compute": {
+      "post": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Elabora una testata non ancora salvata, senza salvare nulla.",
+        "description": "Come `{id}/compute`, ma con i valori ricevuti invece di quelli salvati: serve per\n            l'anteprima di un inventario prima di crearlo, o di una testata modificata prima di salvarla. Di un\n            inventario esistente conta solo l'Id, che lo esclude dalla ricerca dell'inventario fiscale\n            precedente.\n\n`GiacenzeAllineabili` dice se `process` con `alignStock` allineerebbe davvero le\n            giacenze.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Testata da elaborare: nuova (senza Id) o di un inventario esistente, con le\n            modifiche non ancora salvate. Le righe sono ignorate.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce il risultato dell'elaborazione.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventarioComputeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. La testata non è valida.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. La testata ha l'Id di un inventario che non esiste.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "422": {
+            "description": "La stessa Idempotency-Key è già stata usata per una richiesta con metodo, URL o corpo diversi."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/process": {
+      "post": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Salva una testata, la elabora e ne salva le righe.",
+        "description": "Come `{id}/process`, ma crea o aggiorna anche la testata, nella stessa transazione delle\n            righe e delle giacenze: se qualcosa non va non resta niente, nemmeno la testata nuova. L'inventario\n            salvato, con l'Id assegnato e il nuovo `ConcurrencyToken` della testata, è in\n            `Inventario`.\n\n\n            Per aggiornare una testata esistente va mandato il suo `ConcurrencyToken`, come in\n            `PUT`: se nel frattempo un altro client l'ha modificata risponde 422.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "concurrencyToken",
+            "in": "query",
+            "description": "Il `ConcurrencyToken` restituito da `compute`. Se indicato e\n            i dati sono cambiati nel frattempo, così che l'elaborazione dia righe diverse, non salva nulla e\n            risponde 422. Se omesso, salva il risultato dell'elaborazione corrente.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "alignStock",
+            "in": "query",
+            "description": "Se allineare le giacenze del magazzino alle quantità dell'inventario\n            (default `true`).",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Testata da salvare: senza Id viene creata, con l'Id aggiornata. Le righe sono\n            ignorate.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce il risultato dell'elaborazione salvata.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventarioComputeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. La testata non è valida.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. La testata ha l'Id di un inventario che non esiste.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Conflitto. I dati o la testata sono cambiati nel frattempo: va ripetuta l'anteprima.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/distinct": {
+      "get": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Restituisce una lista di elementi distinti.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Selector",
+            "in": "query",
+            "description": "Il campo usato per distinguere gli elementi.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "RagioneSociale1"
+            },
+            "example": "RagioneSociale1"
+          },
+          {
+            "name": "Skip",
+            "in": "query",
+            "description": "Numero di elementi, a partire dal primo, da escludere dal risultato. Combinato con `Take`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 100
+            },
+            "example": 100
+          },
+          {
+            "name": "Take",
+            "in": "query",
+            "description": "Numero di elementi da includere nel risultato. Combinato con `Skip`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 25
+            },
+            "example": 25
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce la lista degli elementi distinti.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DistinctPropertyGroup"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario": {
+      "post": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Salva un nuovo elemento.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validationOverride",
+            "in": "query",
+            "description": "Se applicare eventualmente l'override della validazione.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Istanza dell'elemento da salvare.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creato. Restituisce l'elemento salvato con il `ConcurrencyToken` aggiornato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventario"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto. Restituisce il motivo del conflitto.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore (di solito un problema di validazione).",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "La stessa Idempotency-Key è già stata usata per una richiesta con metodo, URL o corpo diversi."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Restituisce una lista di elementi.",
+        "description": "\nLa risposta include due header con informazioni sui risultati.\n\n`X-Read-TotalCount` indica il numero di elementi che soddisfano il filtro impostato nella query;\n\n`X-Read-Count` indica il numero di elementi effettivamente contenuti nella risposta.\n\nI due header possono riportare valori diversi quando i parametri `Take` e `Skip` sono stati usati nelle opzioni di query.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "SkipTotalCount",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Order",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Expand",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce la lista degli elementi corrispondenti ai criteri di ricerca.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Inventario"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/{id}": {
+      "put": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Aggiorna un elemento esistente.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID univoco dell'elemento da aggiornare.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "validationOverride",
+            "in": "query",
+            "description": "Se applicare eventualmente l'override della validazione.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Istanza dell'elemento da salvare.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inventario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce l'elemento aggiornato con un nuovo valore di `ConcurrencyToken`.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventario"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Conflitto. Restituisce il motivo del conflitto.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. L'elemento non è stato trovato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore (di solito un problema di validazione).",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Elimina un elemento.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID dell'elemento da eliminare.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce l'elemento eliminato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventario"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. L'elemento non è stato trovato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Restituisce un elemento.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID dell'elemento da recuperare.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Expand",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce l'elemento richiesto.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Non trovato. L'elemento non è stato trovato.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/Inventario/new": {
+      "get": {
+        "tags": [
+          "Inventario"
+        ],
+        "summary": "Restituisce una nuova istanza di un oggetto. Dove necessario, i valori delle proprietà saranno coerenti con\nlo stato e la logica dell'applicazione (ad es., una nuova istanza di `Documento` avrà il\n`Numero` appropriato, basato sui documenti preesistenti di tipo compatibile).",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventario"
                 }
               }
             }
@@ -44863,6 +48053,210 @@
           },
           "400": {
             "description": "Bad Request",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v{version}/{companyId}/MovimentoMerce/distinct": {
+      "get": {
+        "tags": [
+          "MovimentoMerce"
+        ],
+        "summary": "Restituisce una lista di elementi distinti.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Versione API.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Selector",
+            "in": "query",
+            "description": "Il campo usato per distinguere gli elementi.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "RagioneSociale1"
+            },
+            "example": "RagioneSociale1"
+          },
+          {
+            "name": "Skip",
+            "in": "query",
+            "description": "Numero di elementi, a partire dal primo, da escludere dal risultato. Combinato con `Take`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 100
+            },
+            "example": 100
+          },
+          {
+            "name": "Take",
+            "in": "query",
+            "description": "Numero di elementi da includere nel risultato. Combinato con `Skip`, è utile per la paginazione.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 25
+            },
+            "example": 25
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce la lista degli elementi distinti.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DistinctPropertyGroup"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Restituisce il motivo dell'errore.",
             "headers": {
               "RateLimit-Limit": {
                 "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
@@ -69965,6 +73359,46 @@
         },
         "additionalProperties": false
       },
+      "DocumentoTotali": {
+        "type": "object",
+        "properties": {
+          "periodo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "anagraficaId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "ragioneSociale": {
+            "type": "string",
+            "nullable": true
+          },
+          "documenti": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totaleImponibile": {
+            "type": "number",
+            "format": "double"
+          },
+          "totaleEsente": {
+            "type": "number",
+            "format": "double"
+          },
+          "totaleImposta": {
+            "type": "number",
+            "format": "double"
+          },
+          "totaleDocumento": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "FatturaElettronicaExportOptions": {
         "type": "object",
         "properties": {
@@ -70624,6 +74058,156 @@
         },
         "additionalProperties": false
       },
+      "Inventario": {
+        "required": [
+          "data",
+          "magazzinoId",
+          "valorizzazione"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "concurrencyToken": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "magazzinoId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "magazzino": {
+            "$ref": "#/components/schemas/Magazzino"
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nome": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "fiscale": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "valorizzazione": {
+            "enum": [
+              "CostoMedio",
+              "CostoUltimo"
+            ],
+            "type": "string"
+          },
+          "escludiArticoliInattivi": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "righe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventarioRiga"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventarioComputeResult": {
+        "type": "object",
+        "properties": {
+          "righe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventarioRiga"
+            },
+            "nullable": true
+          },
+          "avvisi": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "concurrencyToken": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "giacenzeAllineabili": {
+            "type": "boolean"
+          },
+          "inventario": {
+            "$ref": "#/components/schemas/Inventario"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventarioRiga": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "concurrencyToken": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inventarioId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "articoloId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "articolo": {
+            "$ref": "#/components/schemas/Articolo"
+          },
+          "quantità": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "valore": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "identificativo": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "identificativoEsteso": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "colore": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "Listino": {
         "required": [
           "nome"
@@ -71036,6 +74620,9 @@
           "movimentoMerceId": {
             "type": "integer",
             "format": "int32"
+          },
+          "movimentoMerce": {
+            "$ref": "#/components/schemas/MovimentoMerce"
           },
           "articoloId": {
             "type": "integer",
@@ -73304,6 +76891,9 @@
     },
     {
       "name": "Indirizzo"
+    },
+    {
+      "name": "Inventario"
     },
     {
       "name": "Listino",
