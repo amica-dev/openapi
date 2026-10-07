@@ -39,7 +39,7 @@ var config = new Configuration
 var aziende = new AziendaApi(config);
 try
 {
-    var result = aziende.ApiVversionConfigAziendaGet("3");
+    var result = aziende.AziendaList();
     Console.WriteLine(result);
 }
 catch (ApiException e)
