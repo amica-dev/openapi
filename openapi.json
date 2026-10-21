@@ -7,7 +7,7 @@
       "url": "https://amica.dev",
       "email": "assistenza@gestionaleamica.com"
     },
-    "version": "3.2.1",
+    "version": "3.2.2",
     "x-logo": {
       "url": "https://gestionaleamica.com/assets/img/Logo_Amica_Scritta.png",
       "altText": "Amica: tutto il software che serve per gestire la tua azienda"
@@ -78223,7 +78223,7 @@
           },
           "pagata": {
             "type": "boolean",
-            "description": "Indica se la scadenza è pagata.",
+            "description": "Indica se la scadenza è pagata: `ImportoDaPagare`, arrotondato al centesimo, è zero.",
             "readOnly": true,
             "example": false
           },
@@ -78318,7 +78318,7 @@
           },
           "importoDaPagare": {
             "type": "number",
-            "description": "Rimanenza che risulta ancora da pagare.",
+            "description": "Rimanenza che risulta ancora da pagare, arrotondata al centesimo come nel client Windows.",
             "format": "double",
             "readOnly": true,
             "example": 1250.00
