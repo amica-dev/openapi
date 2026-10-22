@@ -7,7 +7,7 @@
       "url": "https://amica.dev",
       "email": "assistenza@gestionaleamica.com"
     },
-    "version": "3.2.2",
+    "version": "3.2.3",
     "x-logo": {
       "url": "https://gestionaleamica.com/assets/img/Logo_Amica_Scritta.png",
       "altText": "Amica: tutto il software che serve per gestire la tua azienda"
@@ -72541,9 +72541,6 @@
         "description": "La banca di un documento (fattura)."
       },
       "BeneServizio": {
-        "required": [
-          "descrizione"
-        ],
         "type": "object",
         "properties": {
           "id": {
@@ -72661,9 +72658,9 @@
             "example": "ART001"
           },
           "descrizione": {
-            "minLength": 1,
             "type": "string",
-            "description": "Descrizione.",
+            "description": "Descrizione. Obbligatoria, tranne che sulle righe di totale per aliquota create dall'importazione dei DDT\ncon `Totali`: hanno `CausaleIvaId` e `Importo` ma niente\n`ArticoloId` né descrizione, e la fattura elettronica usa come loro descrizione il riferimento\nal DDT che le precede.",
+            "nullable": true,
             "example": "Cacciavite a croce"
           },
           "unitàMisura": {
