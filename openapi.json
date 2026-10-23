@@ -7,7 +7,7 @@
       "url": "https://amica.dev",
       "email": "assistenza@gestionaleamica.com"
     },
-    "version": "3.2.4",
+    "version": "3.3.0",
     "x-logo": {
       "url": "https://gestionaleamica.com/assets/img/Logo_Amica_Scritta.png",
       "altText": "Amica: tutto il software che serve per gestire la tua azienda"
@@ -41510,6 +41510,219 @@
         }
       }
     },
+    "/api/v3/{companyId}/Listino/compute": {
+      "post": {
+        "tags": [
+          "Listino"
+        ],
+        "summary": "Esegue una procedura sulle righe di un listino, come il client Windows, senza salvare nulla.",
+        "description": "Il listino può essere nuovo o avere modifiche non salvate: le procedure lavorano sulle righe ricevute. Va\nvalorizzato solo il gruppo di parametri della procedura scelta in `procedura`:\n            \n- `Aggiungi`: una riga per ogni articolo attivo non ancora nel listino, con il solo articolo e il resto a\n  zero, prezzo compreso. Gli articoli sono tutti, quelli del produttore, della marca, della categoria o del\n  gruppo merceologico indicato in `id`, o quelli inseriti dal giorno `dal` in poi. Mai prestazioni.\n- `Duplica`: le righe articolo del listino `listinoId`, clienti o fornitori, per gli articoli non\n  ancora presenti, con prezzo, sconti, ricarico e provvigioni. Le righe di prestazione non si copiano.\n- `ModificaPrezzi`: aumenta o diminuisce il prezzo di ogni riga di una `percentuale`, con il\n  risultato arrotondato ai decimali dei prezzi unitari delle preferenze, o di un `importo` fisso, senza\n  arrotondamento. Va indicato uno solo dei due.\n- `Sconti`: i quattro sconti su ogni riga.\n- `Provvigioni`: le provvigioni di agente e capo area su ogni riga.\n            \nPercentuali, sconti e provvigioni sono frazioni: `0.05` corrisponde al 5%. Le righe nuove hanno Id 0.\nPer salvare il risultato si invia il listino con `POST` o `PUT`. Il listino non si valida: può\nessere ancora senza nome.",
+        "operationId": "ListinoCompute",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "ID univoco dell'azienda.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chiave di idempotenza (opzionale). Inviando la stessa chiave su un retry si riottiene la risposta della prima richiesta senza rieseguire l'operazione: rende sicuri i retry automatici. Usa un valore univoco per operazione logica (es. un UUID). La risposta replicata riporta l'header `Idempotent-Replayed: true`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Il listino aperto con le sue righe attuali, la procedura e i suoi parametri.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListinoComputeData"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListinoComputeData"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListinoComputeData"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successo. Restituisce il listino con le righe risultanti.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListinoComputeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Mancano i parametri della procedura, o il listino da duplicare non esiste.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste: superato il limite di rate per il client.",
+            "headers": {
+              "RateLimit-Limit": {
+                "description": "Numero massimo di richieste consentite al client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Remaining": {
+                "description": "Richieste ancora disponibili per il client nella finestra corrente.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Reset": {
+                "description": "Secondi al rinnovo dei permessi del client.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policy di rate limiting applicata, nel formato `<limite>;w=<finestra in secondi>`.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Secondi da attendere prima di inviare una nuova richiesta.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "Idempotent-Replayed": {
+                "description": "Presente e pari a `true` quando la risposta è la replica di una richiesta precedente con la stessa Idempotency-Key.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflitto: una richiesta con la stessa Idempotency-Key è ancora in elaborazione."
+          },
+          "422": {
+            "description": "La stessa Idempotency-Key è già stata usata per una richiesta con metodo, URL o corpo diversi."
+          },
+          "401": {
+            "description": "Non autenticato: access token mancante, non valido o scaduto. Ottieni un nuovo access token e ripeti la richiesta. La risposta non ha corpo.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Schema di autenticazione richiesto (`Bearer`) ed eventuale motivo del rifiuto del token.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accesso negato. Le cause possibili:\n\n- il token non possiede lo scope richiesto dall'operazione (risposta senza corpo);\n- `code: cloud_not_active`: l'account lavora con una connessione locale e la Cloud API non espone i suoi dati;\n- `code: company_license_not_active`: la licenza dell'azienda indicata nel percorso è scaduta o non è attiva; le altre aziende con licenza attiva restano accessibili.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v3/{companyId}/Listino": {
       "post": {
         "tags": [
@@ -75855,6 +76068,191 @@
         },
         "additionalProperties": false,
         "description": "Listino."
+      },
+      "ListinoComputeAggiungi": {
+        "type": "object",
+        "properties": {
+          "filtro": {
+            "enum": [
+              "Tutti",
+              "Produttore",
+              "Marca",
+              "CategoriaMerceologica",
+              "GruppoMerceologico",
+              "DataInserimento"
+            ],
+            "type": "string",
+            "description": "Quali articoli aggiungere.",
+            "example": "Marca"
+          },
+          "id": {
+            "type": "integer",
+            "description": "Identificativo univoco del produttore, della marca, della categoria o del gruppo merceologico, secondo\n`Filtro`.",
+            "format": "int32",
+            "nullable": true,
+            "example": 12
+          },
+          "dal": {
+            "type": "string",
+            "description": "Con `DataInserimento`, si aggiungono gli articoli inseriti in questa data\no dopo.",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-01-01T00:00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parametri della procedura `Aggiungi`."
+      },
+      "ListinoComputeData": {
+        "type": "object",
+        "properties": {
+          "listino": {
+            "$ref": "#/components/schemas/Listino"
+          },
+          "procedura": {
+            "enum": [
+              "Aggiungi",
+              "Duplica",
+              "ModificaPrezzi",
+              "Sconti",
+              "Provvigioni"
+            ],
+            "type": "string",
+            "description": "La procedura da eseguire sulle righe del listino.",
+            "example": "Aggiungi"
+          },
+          "aggiungi": {
+            "$ref": "#/components/schemas/ListinoComputeAggiungi"
+          },
+          "duplica": {
+            "$ref": "#/components/schemas/ListinoComputeDuplica"
+          },
+          "modificaPrezzi": {
+            "$ref": "#/components/schemas/ListinoComputeModificaPrezzi"
+          },
+          "sconti": {
+            "$ref": "#/components/schemas/ListinoComputeSconti"
+          },
+          "provvigioni": {
+            "$ref": "#/components/schemas/ListinoComputeProvvigioni"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Utilizzato dal metodo `Compute` di `ListinoService`. Contiene il listino aperto, anche\nnon ancora salvato, con le sue righe attuali, la procedura da eseguire e i suoi parametri. Va valorizzato solo il\ngruppo di parametri della procedura scelta."
+      },
+      "ListinoComputeDuplica": {
+        "type": "object",
+        "properties": {
+          "listinoId": {
+            "type": "integer",
+            "description": "Identificativo univoco del `Listino` da cui copiare le righe, clienti o fornitori.",
+            "format": "int32",
+            "example": 891
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parametri della procedura `Duplica`."
+      },
+      "ListinoComputeModificaPrezzi": {
+        "type": "object",
+        "properties": {
+          "operazione": {
+            "enum": [
+              "Aumenta",
+              "Diminuisci"
+            ],
+            "type": "string",
+            "description": "Se aumentare o diminuire i prezzi.",
+            "example": "Aumenta"
+          },
+          "percentuale": {
+            "type": "number",
+            "description": "Variazione percentuale di ogni prezzo, come frazione: `0.05` corrisponde al 5%. Il risultato è arrotondato\nai decimali dei prezzi unitari delle preferenze.",
+            "format": "double",
+            "nullable": true,
+            "example": 0.05
+          },
+          "importo": {
+            "type": "number",
+            "description": "Importo fisso da aggiungere o togliere a ogni prezzo. Il risultato non è arrotondato.",
+            "format": "double",
+            "nullable": true,
+            "example": 1.50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parametri della procedura `ModificaPrezzi`. Va indicato uno solo fra\n`Percentuale` e `Importo`."
+      },
+      "ListinoComputeProvvigioni": {
+        "type": "object",
+        "properties": {
+          "agente": {
+            "type": "number",
+            "description": "Provvigione dell'agente.",
+            "format": "double",
+            "example": 0.05
+          },
+          "capoArea": {
+            "type": "number",
+            "description": "Provvigione del capo area.",
+            "format": "double",
+            "example": 0.02
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parametri della procedura `Provvigioni`: le provvigioni da assegnare a ogni riga,\ncome frazione (`0.05` corrisponde al 5%)."
+      },
+      "ListinoComputeResult": {
+        "type": "object",
+        "properties": {
+          "listino": {
+            "$ref": "#/components/schemas/Listino"
+          },
+          "avvisi": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Avvisi della procedura, da mostrare all'utente.",
+            "nullable": true,
+            "example": [
+              "12 articoli erano già nel listino."
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "Restituito dal metodo `Compute` di `ListinoService`."
+      },
+      "ListinoComputeSconti": {
+        "type": "object",
+        "properties": {
+          "sconto1": {
+            "type": "number",
+            "description": "Primo sconto.",
+            "format": "double",
+            "example": 0.10
+          },
+          "sconto2": {
+            "type": "number",
+            "description": "Secondo sconto.",
+            "format": "double",
+            "example": 0.05
+          },
+          "sconto3": {
+            "type": "number",
+            "description": "Terzo sconto.",
+            "format": "double",
+            "example": 0.00
+          },
+          "sconto4": {
+            "type": "number",
+            "description": "Quarto sconto.",
+            "format": "double",
+            "example": 0.00
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parametri della procedura `Sconti`: i quattro sconti da assegnare a ogni riga, come\nfrazione (`0.10` corrisponde al 10%)."
       },
       "Magazzino": {
         "required": [
