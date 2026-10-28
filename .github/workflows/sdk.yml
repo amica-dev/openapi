@@ -59,7 +59,11 @@ jobs:
           python-version: '3.x'
 
       - name: Pulisci lo spec per gli SDK
-        run: python scripts/clean_openapi_for_sdk.py openapi.json openapi-sdk.json
+        run: |
+          # Solo per Python, che valida anche le risposte: vedi lo script.
+          FLAGS=()
+          if [ "${{ matrix.lang }}" = "python" ]; then FLAGS=(--senza-minlength-obbligatori); fi
+          python scripts/clean_openapi_for_sdk.py openapi.json openapi-sdk.json "${FLAGS[@]}"
 
       - name: Genera SDK (${{ matrix.lang }})
         env:

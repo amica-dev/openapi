@@ -6,8 +6,13 @@
   inutilmente gli SDK. Gli schemi interni che invece sono referenziati (es. body di una
   richiesta) vengono mantenuti, per non rompere i `$ref`.
 - Rimuove l'estensione vendor `x-internal` dagli schemi che restano (i generator non la usano).
+- Con `--senza-minlength-obbligatori` toglie `minLength: 1` dalle proprietà stringa. Serve all'SDK
+  Python, l'unico che valida anche le risposte: un testo obbligatorio che il client Windows ha
+  lasciato vuoto arriva come `""` e farebbe fallire l'intera lista
+  (CIR2000/Amica20.WebApi.CustomerService#36). In scrittura il server rifiuta comunque la stringa
+  vuota con un 400.
 
-Uso: python clean_openapi_for_sdk.py <input.json> <output.json>
+Uso: python clean_openapi_for_sdk.py <input.json> <output.json> [--senza-minlength-obbligatori]
 """
 import json
 import re
@@ -29,12 +34,30 @@ def collect_refs(obj, refs):
             collect_refs(item, refs)
 
 
+def remove_min_length_one(obj):
+    """Toglie `minLength: 1` dalle stringhe in `obj`; restituisce quante ne ha tolte."""
+    removed = 0
+    if isinstance(obj, dict):
+        if obj.get("type") == "string" and obj.get("minLength") == 1:
+            del obj["minLength"]
+            removed += 1
+        for value in obj.values():
+            removed += remove_min_length_one(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            removed += remove_min_length_one(item)
+    return removed
+
+
 def main():
-    if len(sys.argv) != 3:
-        print("uso: clean_openapi_for_sdk.py <input.json> <output.json>", file=sys.stderr)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    if len(args) != 2 or flags - {"--senza-minlength-obbligatori"}:
+        print("uso: clean_openapi_for_sdk.py <input.json> <output.json> [--senza-minlength-obbligatori]",
+              file=sys.stderr)
         sys.exit(2)
 
-    with open(sys.argv[1], encoding="utf-8") as f:
+    with open(args[0], encoding="utf-8") as f:
         spec = json.load(f)
 
     schemas = spec.get("components", {}).get("schemas", {})
@@ -57,7 +80,10 @@ def main():
         if isinstance(schema, dict):
             schema.pop("x-internal", None)
 
-    with open(sys.argv[2], "w", encoding="utf-8") as f:
+    if "--senza-minlength-obbligatori" in flags:
+        print(f"minLength: 1 rimossi: {remove_min_length_one(schemas)}")
+
+    with open(args[1], "w", encoding="utf-8") as f:
         json.dump(spec, f, ensure_ascii=False, indent=2)
 
     print(f"Schemi interni orfani rimossi ({len(removed)}): {', '.join(sorted(removed)) or '-'}")
